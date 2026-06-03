@@ -639,57 +639,59 @@ export default function App() {
       <motion.div 
         initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
-        className="max-w-4xl mx-auto bg-[#121212]/90 border border-white/5 shadow-[0_30px_100px_rgba(0,0,0,0.8)] rounded-3xl overflow-hidden relative backdrop-blur-md"
+        className={`${step === 'welcome' ? 'max-w-6xl' : 'max-w-4xl'} mx-auto bg-[#121212]/90 border border-white/5 shadow-[0_30px_100px_rgba(0,0,0,0.8)] rounded-3xl overflow-hidden relative backdrop-blur-md transition-all duration-500`}
       >
         
         {/* Cinematic Header */}
-        <header id="main-header" className="relative border-b border-white/5 bg-gradient-to-b from-[#181818] to-[#121212] p-8 text-center">
-          <div className="absolute top-4 left-4 flex items-center gap-1.5 px-3 py-1 rounded-full border border-yellow-500/20 bg-yellow-500/5 text-xs text-[#C9A84C] font-semibold tracking-wide">
-            <Flame className="w-3.5 h-3.5 text-[#C9A84C] animate-pulse" />
-            <span>Mapeo Cognitivo Frecuente</span>
-          </div>
-
-          <motion.h1 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="text-4xl sm:text-5xl font-bold font-display tracking-tight text-[#C9A84C] mt-4 mb-2 filter drop-shadow-[0_2px_10px_rgba(201,168,76,0.15)]"
-          >
-            Transformación Interior
-          </motion.h1>
-          <p className="text-sm font-serif italic text-white/60 max-w-lg mx-auto leading-relaxed">
-            "Transformaos por medio de la renovación de vuestro entendimiento, comprobando la buena de Dios..." — Romanos 12:2
-          </p>
-
-          {/* Stepper progress indicator */}
-          {step !== 'welcome' && (
-            <div className="mt-8 relative max-w-md mx-auto">
-              <div className="flex justify-between text-xs text-white/40 mb-2 font-mono">
-                <span>Rastreo Integral</span>
-                <span>
-                  {step === 'screening' && ` Screening: ${screeningIndex + 1} / 9`}
-                  {step === 'calculating_blocks' && `Calculando activación`}
-                  {step === 'deep_dive' && `Profundización: ${deepDiveIndex + 1} / ${deepDiveQuestions.length}`}
-                  {step === 'results' && 'Tu Diagnóstico'}
-                </span>
-              </div>
-              <div id="progress-track" className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden">
-                <motion.div 
-                  className="h-full bg-gradient-to-r from-[#C9A84C] to-yellow-600 shadow-[0_0_8px_#C9A84C]"
-                  initial={{ width: 0 }}
-                  animate={{ 
-                    width: `${
-                      step === 'screening' ? ((screeningIndex + 1) / 18) * 100 :
-                      step === 'calculating_blocks' ? 50 :
-                      step === 'deep_dive' ? (50 + ((deepDiveIndex + 1) / deepDiveQuestions.length) * 50) :
-                      step === 'generating_results' ? 95 : 100
-                    }%` 
-                  }}
-                  transition={{ duration: 0.3 }}
-                />
-              </div>
+        {step !== 'welcome' && (
+          <header id="main-header" className="relative border-b border-white/5 bg-gradient-to-b from-[#181818] to-[#121212] p-8 text-center">
+            <div className="absolute top-4 left-4 flex items-center gap-1.5 px-3 py-1 rounded-full border border-yellow-500/20 bg-yellow-500/5 text-xs text-[#C9A84C] font-semibold tracking-wide">
+              <Flame className="w-3.5 h-3.5 text-[#C9A84C] animate-pulse" />
+              <span>Mapeo Cognitivo Frecuente</span>
             </div>
-          )}
-        </header>
+
+            <motion.h1 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="text-4xl sm:text-5xl font-bold font-display tracking-tight text-[#C9A84C] mt-4 mb-2 filter drop-shadow-[0_2px_10px_rgba(201,168,76,0.15)]"
+            >
+              Transformación Interior
+            </motion.h1>
+            <p className="text-sm font-serif italic text-white/60 max-w-lg mx-auto leading-relaxed">
+              "Transformaos por medio de la renovación de vuestro entendimiento, comprobando la buena de Dios..." — Romanos 12:2
+            </p>
+
+            {/* Stepper progress indicator */}
+            {step !== 'welcome' && (
+              <div className="mt-8 relative max-w-md mx-auto">
+                <div className="flex justify-between text-xs text-white/40 mb-2 font-mono">
+                  <span>Rastreo Integral</span>
+                  <span>
+                    {step === 'screening' && ` Screening: ${screeningIndex + 1} / 9`}
+                    {step === 'calculating_blocks' && `Calculando activación`}
+                    {step === 'deep_dive' && `Profundización: ${deepDiveIndex + 1} / ${deepDiveQuestions.length}`}
+                    {step === 'results' && 'Tu Diagnóstico'}
+                  </span>
+                </div>
+                <div id="progress-track" className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden">
+                  <motion.div 
+                    className="h-full bg-gradient-to-r from-[#C9A84C] to-yellow-600 shadow-[0_0_8px_#C9A84C]"
+                    initial={{ width: 0 }}
+                    animate={{ 
+                      width: `${
+                        step === 'screening' ? ((screeningIndex + 1) / 18) * 100 :
+                        step === 'calculating_blocks' ? 50 :
+                        step === 'deep_dive' ? (50 + ((deepDiveIndex + 1) / deepDiveQuestions.length) * 50) :
+                        step === 'generating_results' ? 95 : 100
+                      }%` 
+                    }}
+                    transition={{ duration: 0.3 }}
+                  />
+                </div>
+              </div>
+            )}
+          </header>
+        )}
 
         {/* Dynamic Wizard Steps */}
         <main id="main-content" className="p-6 sm:p-10 relative">
@@ -699,104 +701,217 @@ export default function App() {
             {step === 'welcome' && (
               <motion.div
                 key="welcome-pane"
-                initial={{ opacity: 0, scale: 0.98 }}
-                animate={{ opacity: 1, scale: 1 }}
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.98 }}
-                transition={{ duration: 0.4 }}
-                className="space-y-8"
+                transition={{ duration: 0.5 }}
+                className="space-y-10"
               >
-                <div className="text-center max-w-2xl mx-auto space-y-4">
-                  <span className="text-[#C9A84C] uppercase text-xs font-mono tracking-[0.25em] font-semibold block">SISTEMA CIENTÍFICO BÍBLICO DE DIAGNÓSTICO</span>
-                  <h2 className="text-2xl sm:text-3xl font-bold font-display text-white leading-tight">
-                    "Hay voces en tu interior que decidieron tu futuro antes de que tú lo hicieras."
-                  </h2>
-                  <p className="text-white/70 text-base leading-relaxed font-sans">
-                    Bienvenido a una experiencia clínica y espiritual de autoconocimiento profundo. Este test explora los <strong>9 bloques cognitivos limitantes</strong> que rigen tu conducta inconsciente, contrastándolos con neurociencia y la verdad inquebrantable de tu identidad en Cristo.
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl mx-auto">
-                  <div className="bg-[#181818] border border-white/5 p-5 rounded-2xl text-center flex flex-col items-center gap-3">
-                    <div className="bg-[#C9A84C]/10 p-3 rounded-full text-[#C9A84C]">
-                      <Brain className="w-6 h-6" />
+                {/* Floating Topbar Header inside Welcome screen */}
+                <div className="flex flex-col md:flex-row justify-between items-center pb-6 border-b border-white/5 gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#C9A84C] to-yellow-600 flex items-center justify-center text-[#0D0D0D] shadow-lg shadow-[#C9A84C]/10">
+                      <Brain className="w-5 h-5" />
                     </div>
-                    <h3 className="font-bold text-white text-sm">Respuesta Neurobiológica</h3>
-                    <p className="text-white/55 text-xs">Entiende qué hormonas y circuitos sinápticos activa cada temor.</p>
+                    <div>
+                      <span className="text-[10px] tracking-[0.2em] font-mono text-[#C9A84C]/80 uppercase block font-semibold">Plataforma de Crecimiento</span>
+                      <h2 className="text-lg font-bold text-white tracking-tight -mt-0.5">Transformación Interior</h2>
+                    </div>
                   </div>
-                  <div className="bg-[#181818] border border-white/5 p-5 rounded-2xl text-center flex flex-col items-center gap-3">
-                    <div className="bg-[#C9A84C]/10 p-3 rounded-full text-[#C9A84C]">
-                      <BookOpen className="w-6 h-6" />
-                    </div>
-                    <h3 className="font-bold text-white text-sm">Contraste de Identidad</h3>
-                    <p className="text-white/55 text-xs">Derriba mentiras con argumentos teológicos precisos y anclados.</p>
-                  </div>
-                  <div className="bg-[#181818] border border-white/5 p-5 rounded-2xl text-center flex flex-col items-center gap-3">
-                    <div className="bg-[#C9A84C]/10 p-3 rounded-full text-[#C9A84C]">
-                      <Calendar className="w-6 h-6" />
-                    </div>
-                    <h3 className="font-bold text-white text-sm">Plan de 30 Días</h3>
-                    <p className="text-white/55 text-xs">Ejercicios prácticos con checklists reales de renovación mental.</p>
+                  <div className="text-center md:text-right">
+                    <p className="text-xs font-serif italic text-white/50 max-w-sm">
+                      "Transformaos por medio de la renovación de vuestro entendimiento..."
+                      <span className="block not-italic font-mono text-[9px] uppercase font-bold text-[#C9A84C] mt-0.5">— Romanos 12:2</span>
+                    </p>
                   </div>
                 </div>
 
-                <div className="bg-amber-500/5 border border-[#C9A84C]/15 p-6 rounded-2xl max-w-2xl mx-auto text-center font-serif text-white/80 italic leading-relaxed relative">
-                  "Porque cual es su pensamiento en su corazón, tal es él."
-                  <br /><strong>— Proverbios 23:7</strong>
+                {/* Hero Columns Section */}
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                  
+                  {/* Left Column: Emotion, Mystery and Authoritative Content (span 7) */}
+                  <div className="lg:col-span-7 space-y-6">
+                    
+                    {/* Glowing Accent Badge */}
+                    <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-[#C9A84C]/30 bg-[#C9A84C]/5 text-[11px] text-[#C9A84C] font-mono uppercase tracking-[0.15em]">
+                      <Sparkles className="w-3.5 h-3.5 animate-pulse text-[#C9A84C]" />
+                      <span>Sinfonía de Neurociencia & Sabiduría Divina</span>
+                    </div>
+
+                    {/* Titular Principal */}
+                    <h1 className="text-2xl sm:text-3.5xl lg:text-4xl font-extrabold text-white tracking-tight leading-tight font-display">
+                      ¿Y si el mayor obstáculo para tu futuro no estuviera delante de ti... <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#C9A84C] to-yellow-500 drop-shadow-[0_2px_15px_rgba(201,168,76,0.25)]">sino dentro de ti?</span>
+                    </h1>
+
+                    {/* Subtítulo (Deep emotional trigger paragraphs) */}
+                    <div className="space-y-4 text-white/80 text-sm sm:text-base leading-relaxed font-sans font-light">
+                      <p>
+                        Durante años has tomado decisiones creyendo que eras libre.
+                      </p>
+                      <p>
+                        Pero algunas de tus creencias más profundas pudieron haberse formado por heridas, experiencias, miedos o mensajes que aceptaste como verdad.
+                      </p>
+                      <p className="text-[#C9A84C] font-normal border-l-2 border-[#C9A84C]/40 pl-4 bg-[#C9A84C]/5 py-2 rounded-r-xl">
+                        Descubre qué patrones invisibles están moldeando tus decisiones y comienza a renovar tu manera de pensar hoy mismo.
+                      </p>
+                    </div>
+
+                    {/* Ultra-Polished Clinical Dashboard Card (Texto de Impacto) */}
+                    <div className="bg-[#161616]/70 border border-white/5 p-6 rounded-2xl relative overflow-hidden space-y-4">
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-[radial-gradient(circle_at_top_right,rgba(201,168,76,0.06),transparent)] pointer-events-none" />
+                      
+                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                        <span className="text-[10px] font-mono uppercase tracking-widest text-[#C9A84C] font-semibold">Tasa de Comportamiento Inconsciente</span>
+                        <div className="flex items-center gap-2 bg-yellow-950/20 px-2 py-1 rounded border border-[#C9A84C]/20">
+                          <Activity className="w-3.5 h-3.5 text-[#C9A84C] animate-pulse" />
+                          <span className="text-[#C9A84C] font-mono text-xs font-bold">95% de Autómata</span>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <h4 className="text-white text-sm font-semibold tracking-wide">El 95% de nuestras decisiones ocurren de forma automática.</h4>
+                        <p className="text-white/50 text-xs leading-relaxed">
+                          Muchas personas luchan continuamente contra síntomas visibles con pura fuerza de voluntad, sin percatarse del lazo oculto:
+                        </p>
+                      </div>
+
+                      {/* Diagnostic Checklist */}
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 pt-1.5">
+                        {[
+                          { title: 'Procrastinación', badge: 'Retraso' },
+                          { title: 'Miedo al fracaso', badge: 'Parálisis' },
+                          { title: 'Falta de confianza', badge: 'Duda' },
+                          { title: 'Relaciones conflictivas', badge: 'Patrón' },
+                          { title: 'Autosabotaje', badge: 'Límite' },
+                          { title: 'Estancamiento financiero', badge: 'Bloqueo' }
+                        ].map((item) => (
+                          <div key={item.title} className="flex items-center gap-2 text-xs text-white/90">
+                            <span className="text-amber-500 font-extrabold">✓</span>
+                            <span className="font-medium">{item.title}</span>
+                          </div>
+                        ))}
+                      </div>
+
+                      <p className="text-[11px] text-white/55 leading-relaxed pt-3 border-t border-white/5">
+                        Sin darse cuenta de que detrás existe una <strong>compleja estructura de creencias profundas</strong> que dirige cada decisión bajo la sombra.
+                      </p>
+                    </div>
+
+                    {/* Proverbios Quote Badge */}
+                    <div className="bg-[#1C1C1C]/40 border border-white/5 px-4 py-3 rounded-xl flex items-center gap-3 text-xs italic text-white/70 font-serif">
+                      <span className="text-[#C9A84C] text-lg font-bold leading-none font-serif">“</span>
+                      <span>Porque cual es su pensamiento en su corazón, tal es él. — Proverbios 23:7</span>
+                    </div>
+
+                  </div>
+
+                  {/* Right Column: Profile Gate Form & Action (span 5) */}
+                  <div className="lg:col-span-5">
+                    <form 
+                      id="gate-form" 
+                      onSubmit={handleStartScreening} 
+                      className="bg-[#161616]/90 border border-[#C9A84C]/25 p-6 sm:p-7 rounded-[24px] shadow-2xl relative overflow-hidden space-y-6"
+                    >
+                      {/* Decorative Gold flare blur inside the card */}
+                      <div className="absolute -right-16 -top-16 w-32 h-32 rounded-full bg-[#C9A84C]/10 blur-2xl pointer-events-none" />
+
+                      <div className="space-y-1.5">
+                        <span className="text-[10px] tracking-[0.25em] font-mono text-[#C9A84C]/80 block uppercase font-bold">Puerta de Acceso</span>
+                        <h3 className="text-lg font-bold text-white tracking-tight">Prepara tu Perfil Personal</h3>
+                        <p className="text-xs text-white/50 leading-relaxed">
+                          Introduce tus datos confidenciales para mapear tus patrones neurológicos bajo la luz del diagnóstico.
+                        </p>
+                      </div>
+
+                      {/* Input fields */}
+                      <div className="space-y-4">
+                        <div className="space-y-1.5">
+                          <label className="text-xs text-[#C9A84C] font-mono uppercase tracking-wider font-semibold flex items-center gap-1.5">
+                            <User className="w-3.5 h-3.5" /> Nombre o Pseudónimo
+                          </label>
+                          <div className="relative">
+                            <input 
+                              type="text" 
+                              required
+                              value={userName}
+                              onChange={(e) => setUserName(e.target.value)}
+                              placeholder="Ej. María o Samuel" 
+                              className="w-full bg-[#202020] border border-white/5 rounded-xl pl-4 pr-4 py-3 text-sm focus:outline-none focus:border-[#C9A84C] text-white transition-all focus:bg-[#252525] placeholder:text-white/20"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-xs text-[#C9A84C] font-mono uppercase tracking-wider font-semibold flex items-center gap-1.5">
+                            <Mail className="w-3.5 h-3.5" /> Correo Electrónico
+                          </label>
+                          <div className="relative">
+                            <input 
+                              type="email" 
+                              required
+                              value={userEmail}
+                              onChange={(e) => setUserEmail(e.target.value)}
+                              placeholder="correo@ejemplo.com" 
+                              className="w-full bg-[#202020] border border-white/5 rounded-xl pl-4 pr-4 py-3 text-sm focus:outline-none focus:border-[#C9A84C] text-white transition-all focus:bg-[#252525] placeholder:text-white/20"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Terms Acceptance */}
+                      <div className="flex items-start gap-2.5 bg-[#202020]/20 p-3.5 rounded-xl border border-white/5">
+                        <input 
+                          type="checkbox" 
+                          id="opt-terms" 
+                          checked={acceptedTerms}
+                          onChange={(e) => setAcceptedTerms(e.target.checked)}
+                          className="mt-1 w-4 h-4 cursor-pointer accent-[#C9A84C] rounded border-white/10" 
+                        />
+                        <label htmlFor="opt-terms" className="text-[11px] text-white/45 leading-normal cursor-pointer select-none">
+                          Autorizo registrar mis respuestas de forma segura y descargo la responsabilidad en pro del autoconocimiento.
+                        </label>
+                      </div>
+
+                      {/* Primary GRAND CTA Button */}
+                      <button 
+                        type="submit"
+                        id="btn-gate-start"
+                        disabled={!acceptedTerms}
+                        className="w-full relative group overflow-hidden bg-gradient-to-r from-[#C9A84C] to-yellow-600 disabled:from-gray-700 disabled:to-gray-800 disabled:text-white/40 disabled:pointer-events-none text-[#0D0D0D] font-bold py-4 px-6 rounded-xl hover:shadow-[0_0_25px_rgba(201,168,76,0.35)] hover:scale-[1.01] transition-all flex items-center justify-center gap-2 cursor-pointer"
+                      >
+                        <span className="relative z-10 text-sm tracking-wide">Descubrir mi mapa mental oculto</span>
+                        <ArrowRight className="w-4 h-4 relative z-10 transition-transform group-hover:translate-x-1" />
+                        <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </button>
+
+                      {/* Supportive Info Badge List (Structured layout) */}
+                      <div className="grid grid-cols-2 gap-3 pt-3.5 border-t border-white/5">
+                        <div className="flex items-center gap-2 text-white/70">
+                          <Clock className="w-4 h-4 text-[#C9A84C] flex-shrink-0" />
+                          <span className="text-[11px] leading-tight font-medium">⏱ Duración: 6 minutos</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-white/70">
+                          <Activity className="w-4 h-4 text-[#C9A84C] flex-shrink-0" />
+                          <span className="text-[11px] leading-tight font-medium">📊 Diagnóstico personal</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-white/70">
+                          <Brain className="w-4 h-4 text-[#C9A84C] flex-shrink-0" />
+                          <span className="text-[11px] leading-tight font-medium">🧠 Patrones cognitivos</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-white/70">
+                          <BookOpen className="w-4 h-4 text-[#C9A84C] flex-shrink-0" />
+                          <span className="text-[11px] leading-tight font-medium">📖 Principios bíblicos</span>
+                        </div>
+                      </div>
+
+                      <div className="text-center text-white/35 text-[10px] font-mono uppercase tracking-wider pt-1">
+                        🔒 Privacidad total y cifrado local
+                      </div>
+                    </form>
+                  </div>
+
                 </div>
 
-                {/* Gate Form */}
-                <form id="gate-form" onSubmit={handleStartScreening} className="max-w-md mx-auto bg-[#161616] p-6 rounded-2xl border border-white/5 space-y-4">
-                  <h3 className="text-sm font-semibold text-[#C9A84C] uppercase tracking-wider text-center mb-2">Prepara tu Perfil Personal</h3>
-                  <div className="space-y-3">
-                    <div className="relative">
-                      <User className="w-4 h-4 text-white/40 absolute left-3 top-3.5" />
-                      <input 
-                        type="text" 
-                        required
-                        value={userName}
-                        onChange={(e) => setUserName(e.target.value)}
-                        placeholder="Ingresa tu nombre" 
-                        className="w-full bg-[#202020] border border-white/5 rounded-xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:border-[#C9A84C] text-white"
-                      />
-                    </div>
-                    <div className="relative">
-                      <Mail className="w-4 h-4 text-white/40 absolute left-3 top-3.5" />
-                      <input 
-                        type="email" 
-                        required
-                        value={userEmail}
-                        onChange={(e) => setUserEmail(e.target.value)}
-                        placeholder="Correo electrónico para recibir el reporte" 
-                        className="w-full bg-[#202020] border border-white/5 rounded-xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:border-[#C9A84C] text-white"
-                      />
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-2 pt-2">
-                    <input 
-                      type="checkbox" 
-                      id="opt-terms" 
-                      checked={acceptedTerms}
-                      onChange={(e) => setAcceptedTerms(e.target.checked)}
-                      className="mt-1 accent-[#C9A84C]" 
-                    />
-                    <label htmlFor="opt-terms" className="text-[11px] text-white/45 leading-relaxed">
-                      Autorizo registrar mis respuestas de forma segura y descargo la responsabilidad en pro del autoconocimiento.
-                    </label>
-                  </div>
-
-                  <button 
-                    type="submit"
-                    id="btn-gate-start"
-                    disabled={!acceptedTerms}
-                    className="w-full bg-gradient-to-r from-[#C9A84C] to-yellow-600 disabled:from-gray-700 disabled:to-gray-800 disabled:text-white/40 text-[#0D0D0D] font-bold py-3.5 px-6 rounded-xl hover:shadow-[0_0_20px_rgba(201,168,76,0.3)] hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 cursor-pointer"
-                  >
-                    Iniciar Test de 8 Minutos <ArrowRight className="w-4 h-4" />
-                  </button>
-                </form>
-
-                <div className="text-center text-white/30 text-xs">
-                  🔒 Procesado localmente libre de cookies comerciales • Duración aproximada: 8 minutos
-                </div>
               </motion.div>
             )}
 
