@@ -2,5 +2,7 @@
   "name": "Transformación Interior",
   "description": "Una guía interactiva de autoconocimiento y renovación del entendimiento basada en principios bíblicos.",
   "requestFramePermissions": [],
-  "majorCapabilities": []
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }
