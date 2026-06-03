@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import { creenciasDatabase, bloquesDiagnostico, CreenciaRecord } from './data/creencias';
 import { generateFallbackData, AIDiagnosis } from './utils/fallbackGenerator';
+import { downloadPDFResults } from './utils/pdfGenerator';
 
 export interface UserResult extends CreenciaRecord {
   category: string;
@@ -528,6 +529,11 @@ export default function App() {
   // Plain-text Devotional exporter
   const handleExportText = () => {
     downloadResults();
+  };
+
+  // PDF Devotional exporter
+  const handleExportPDF = () => {
+    downloadPDFResults(userName, userEmail, aiDiagnosis, results, journalNotes);
   };
 
   return (
@@ -1717,10 +1723,17 @@ export default function App() {
                     {/* Exporter and reset buttons */}
                     <div className="flex flex-col sm:flex-row justify-center gap-4 pt-4">
                       <button 
-                        onClick={handleExportText}
+                        onClick={handleExportPDF}
                         className="bg-gradient-to-r from-[#C9A84C] to-yellow-600 text-[#0D0D0D] font-bold px-10 py-4 rounded-xl text-base shadow-xl hover:-translate-y-0.5 transition-all flex items-center justify-center gap-3 w-full sm:w-auto cursor-pointer"
                       >
-                        <Download className="w-5 h-5" /> Descargar mi Guía de 30 Días (TXT)
+                        <Download className="w-5 h-5" /> Descargar mi Guía de 30 Días (PDF)
+                      </button>
+
+                      <button 
+                        onClick={handleExportText}
+                        className="flex items-center justify-center gap-2 px-8 py-4 rounded-xl font-bold bg-[#1C1C1C] hover:bg-[#262626] border border-white/5 text-white/70 hover:text-white transition-all w-full sm:w-auto cursor-pointer"
+                      >
+                        <Download className="w-4 h-4" /> Exportar (TXT)
                       </button>
 
                       <button 
