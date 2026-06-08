@@ -62,7 +62,7 @@ export const downloadPDFResults = (
     doc.setFont("Helvetica", "bold");
     doc.setFontSize(22);
     doc.setTextColor(20, 20, 20);
-    doc.text("MANUAL DE COGNICIÓN Y FE", margin + 10, y);
+    doc.text("Transformación Interior", margin + 10, y);
     
     y += 10;
     doc.setFont("Helvetica", "italic");
