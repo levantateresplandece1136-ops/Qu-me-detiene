@@ -117,6 +117,16 @@ const getDeepDivePastoralFeedback = (bloque: string, score: number, name: string
   }
 };
 
+const getExploradorLevel = (xp: number) => {
+  if (xp >= 600) return { title: "Arquitecto de Vida 👑", lvl: 7, nextXp: 700 };
+  if (xp >= 500) return { title: "Transformador 🔥", lvl: 6, nextXp: 600 };
+  if (xp >= 400) return { title: "Renovador ✦", lvl: 5, nextXp: 500 };
+  if (xp >= 300) return { title: "Reconstructor ⚒", lvl: 4, nextXp: 400 };
+  if (xp >= 200) return { title: "Investigador 🔍", lvl: 3, nextXp: 300 };
+  if (xp >= 100) return { title: "Explorador 🧭", lvl: 2, nextXp: 200 };
+  return { title: "Despierto 👁", lvl: 1, nextXp: 100 };
+};
+
 export default function App() {
   const [step, setStep] = useState<Step>(() => {
     const saved = localStorage.getItem('ti_step');
@@ -124,6 +134,21 @@ export default function App() {
   });
   const [userName, setUserName] = useState(() => localStorage.getItem('ti_user_name') || '');
   const [userEmail, setUserEmail] = useState(() => localStorage.getItem('ti_user_email') || '');
+  const [userAge, setUserAge] = useState(() => localStorage.getItem('ti_user_age') || '');
+  const [userGoal, setUserGoal] = useState(() => localStorage.getItem('ti_user_goal') || '');
+  const [userXp, setUserXp] = useState<number>(() => {
+    const saved = localStorage.getItem('ti_user_xp');
+    return saved ? parseInt(saved, 10) : 0;
+  });
+  const [achievements, setAchievements] = useState<Record<string, boolean>>(() => {
+    const saved = localStorage.getItem('ti_achievements');
+    return saved ? JSON.parse(saved) : {};
+  });
+  const [currentSelectedRegion, setCurrentSelectedRegion] = useState<string>(() => {
+    return localStorage.getItem('ti_selected_region') || 'capacidad-identidad';
+  });
+  const [xpNotification, setXpNotification] = useState<{ xp: number; label: string } | null>(null);
+  const [newAchievementAlert, setNewAchievementAlert] = useState<{ name: string; description: string } | null>(null);
   const [acceptedTerms, setAcceptedTerms] = useState(true);
 
   // Capa 1: Screening Answers (blockId -> score 1 to 5)
@@ -251,6 +276,11 @@ export default function App() {
     localStorage.setItem('ti_intro_paragraph', introParagraph);
     localStorage.setItem('ti_completed_days', JSON.stringify(completedDays));
     localStorage.setItem('ti_journal_notes', JSON.stringify(journalNotes));
+    localStorage.setItem('ti_user_age', userAge);
+    localStorage.setItem('ti_user_goal', userGoal);
+    localStorage.setItem('ti_user_xp', userXp.toString());
+    localStorage.setItem('ti_achievements', JSON.stringify(achievements));
+    localStorage.setItem('ti_selected_region', currentSelectedRegion);
 
     // AI Transformation kit serialization
     if (aiDiagnosis) {
@@ -278,7 +308,12 @@ export default function App() {
     activeTab,
     progressScores,
     selectedDayIndex,
-    isUnveiled
+    isUnveiled,
+    userAge,
+    userGoal,
+    userXp,
+    achievements,
+    currentSelectedRegion
   ]);
 
   const screeningList = useMemo(() => {
@@ -293,12 +328,16 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [step, screeningIndex, deepDiveIndex]);
 
-  // Load name and email from localStorage if they exist
+  // Load profile from localStorage if they exist
   useEffect(() => {
     const savedName = localStorage.getItem('ti_user_name');
     const savedEmail = localStorage.getItem('ti_user_email');
+    const savedAge = localStorage.getItem('ti_user_age');
+    const savedGoal = localStorage.getItem('ti_user_goal');
     if (savedName) setUserName(savedName);
     if (savedEmail) setUserEmail(savedEmail);
+    if (savedAge) setUserAge(savedAge);
+    if (savedGoal) setUserGoal(savedGoal);
   }, []);
 
   const handleStartScreening = (e: React.FormEvent) => {
@@ -311,39 +350,133 @@ export default function App() {
       alert('Por favor ingresa un correo electrónico válido para registrar tu perfil.');
       return;
     }
+    if (!userAge.trim()) {
+      alert('Por favor ingresa tu edad.');
+      return;
+    }
+    if (!userGoal.trim()) {
+      alert('Por favor selecciona tu propósito principal para esta expedición.');
+      return;
+    }
+
     localStorage.setItem('ti_user_name', userName);
     localStorage.setItem('ti_user_email', userEmail);
+    localStorage.setItem('ti_user_age', userAge);
+    localStorage.setItem('ti_user_goal', userGoal);
+
+    // Initial Onboarding XP & Achievement
+    setUserXp(25);
+    setAchievements(prev => ({
+      ...prev,
+      'primer-paso': true
+    }));
+    
+    setXpNotification({ xp: 25, label: "¡Ficha de Explorador Preparada!" });
+    setNewAchievementAlert({ 
+      name: "Primer Paso ⚔️", 
+      description: "Has iniciado tu Expedición al Territorio Interior con valentía." 
+    });
+
+    setTimeout(() => {
+      setXpNotification(null);
+    }, 3200);
+
+    setTimeout(() => {
+      setNewAchievementAlert(null);
+    }, 4500);
+
     setStep('screening');
   };
 
-  const handleScreeningAnswer = (score: number) => {
+  const handleMapRegionAnswer = (regionId: string, score: number) => {
     if (isAnswering) return; // Prevent double taps
 
-    const currentBlockId = screeningList[screeningIndex].id;
-    setScreeningAnswers(prev => ({
-      ...prev,
-      [currentBlockId]: score
-    }));
+    setScreeningAnswers(prev => {
+      const updated = {
+        ...prev,
+        [regionId]: score
+      };
 
-    // Generate warm clinical-pastoral feedback
-    const feedback = getPastoralConversationalFeedback(currentBlockId, score, userName);
+      // Award XP for first discovery of this region
+      const alreadyAnswered = prev[regionId] !== undefined;
+      if (!alreadyAnswered) {
+        setUserXp(currentXp => currentXp + 30);
+        setXpNotification({ 
+          xp: 30, 
+          label: `¡Región "${bloquesDiagnostico[regionId as keyof typeof bloquesDiagnostico]?.title}" Explorada!` 
+        });
+        setTimeout(() => setXpNotification(null), 3000);
+      }
+
+      // Check for mid-journey Milestone achievement (4 regions completed)
+      const completedCount = Object.keys(updated).length;
+      if (completedCount === 4) {
+        setAchievements(ach => {
+          const upd = { ...ach, 'explorador-valiente': true };
+          localStorage.setItem('ti_achievements', JSON.stringify(upd));
+          setNewAchievementAlert({ 
+            name: "Explorador Valiente 🗺️", 
+            description: "Has trazado con éxito la mitad de tu Territorio Interior." 
+          });
+          setTimeout(() => setNewAchievementAlert(null), 4500);
+          return upd;
+        });
+        setUserXp(currentXp => currentXp + 40);
+      }
+
+      return updated;
+    });
+
+    // Generate clinical-pastoral feedback
+    const feedback = getPastoralConversationalFeedback(regionId, score, userName);
     setAnsweringFeedback(feedback);
     setIsAnswering(true);
 
-    const transitionDelay = 1800; // 1.8 seconds to allow reading the supportive message
+    const transitionDelay = 2200;
 
-    if (screeningIndex < screeningList.length - 1) {
+    // Check if ALL 9 regions are fully completed
+    const keys = Object.keys(bloquesDiagnostico);
+    const answeredKeys = Object.keys(screeningAnswers);
+    if (!answeredKeys.includes(regionId)) {
+      answeredKeys.push(regionId);
+    }
+    const allCompleted = keys.every(k => answeredKeys.includes(k));
+
+    if (allCompleted) {
+      // Award Final Regional Conquest Medal & bonus XP
+      setAchievements(ach => {
+        const upd = { ...ach, 'rompedor-de-cadenas': true };
+        localStorage.setItem('ti_achievements', JSON.stringify(upd));
+        return upd;
+      });
+      setUserXp(xp => xp + 50);
+
       setTimeout(() => {
-        setScreeningIndex(prev => prev + 1);
-        setIsAnswering(false);
-        setAnsweringFeedback('');
+        setAnsweringFeedback("¡Excelente expedicionario/a! Has cartografiado las 9 regiones de tu Territorio Interior. Revelando caminos profundos...");
+        setXpNotification({ xp: 50, label: "¡Consorcio Regional Completado!" });
+        setNewAchievementAlert({ 
+          name: "Rompedor de Cadenas ⛓️", 
+          description: "Mapeaste el 100% de tus regiones e inicias el Descenso Mental." 
+        });
+        setTimeout(() => setXpNotification(null), 3000);
+        setTimeout(() => setNewAchievementAlert(null), 4500);
       }, transitionDelay);
-    } else {
+
       setTimeout(() => {
         setStep('calculating_blocks');
         setIsAnswering(false);
         setAnsweringFeedback('');
-      }, transitionDelay + 100);
+      }, transitionDelay + 2500);
+    } else {
+      setTimeout(() => {
+        // Find next uncompleted region key
+        const nextUncompleted = keys.find(k => k !== regionId && !answeredKeys.includes(k));
+        if (nextUncompleted) {
+          setCurrentSelectedRegion(nextUncompleted);
+        }
+        setIsAnswering(false);
+        setAnsweringFeedback('');
+      }, transitionDelay);
     }
   };
 
@@ -394,12 +527,17 @@ export default function App() {
       [currentQuestion.id]: score
     }));
 
+    // Award XP (15 XP for cataloging each deep belief node)
+    setUserXp(currentXp => currentXp + 15);
+    setXpNotification({ xp: 15, label: `Descifrando: ${currentQuestion.bloque}` });
+    setTimeout(() => setXpNotification(null), 3000);
+
     // Generate warm deep-dive feedback
     const feedback = getDeepDivePastoralFeedback(currentQuestion.bloque, score, userName);
     setAnsweringFeedback(feedback);
     setIsAnswering(true);
 
-    const transitionDelay = 1800; // 1.8 seconds
+    const transitionDelay = 2200; // 2.2 seconds to absorb the pastoral translation
 
     if (deepDiveIndex < deepDiveQuestions.length - 1) {
       setTimeout(() => {
@@ -408,11 +546,30 @@ export default function App() {
         setAnsweringFeedback('');
       }, transitionDelay);
     } else {
+      // Award Descent Completion Achievement
+      setAchievements(ach => {
+        const upd = { ...ach, 'ojo-revelador': true };
+        localStorage.setItem('ti_achievements', JSON.stringify(upd));
+        return upd;
+      });
+      setUserXp(currentXp => currentXp + 60);
+
+      setTimeout(() => {
+        setAnsweringFeedback("¡Descenso culminado con éxito! Las mentiras limitantes de tu inconsciente han sido expuestas ante la luz divina. Preparando tu Renovación...");
+        setXpNotification({ xp: 60, label: "¡Descenso Mental Concluido!" });
+        setNewAchievementAlert({ 
+          name: "Ojo Revelador 👁️", 
+          description: "Has completado la expedición a tus creencias más ocultas y sepultadas." 
+        });
+        setTimeout(() => setXpNotification(null), 3000);
+        setTimeout(() => setNewAchievementAlert(null), 4500);
+      }, transitionDelay);
+
       setTimeout(() => {
         setStep('generating_results');
         setIsAnswering(false);
         setAnsweringFeedback('');
-      }, transitionDelay + 100);
+      }, transitionDelay + 2500);
     }
   };
 
@@ -434,6 +591,11 @@ export default function App() {
     setProgressScores({ anxiety: 5, confidence: 5, obedience: 5, hope: 5, frequency: 5 });
     setSelectedDayIndex(0);
     setIsUnveiled(false);
+    setUserAge('');
+    setUserGoal('');
+    setUserXp(0);
+    setAchievements({});
+    setCurrentSelectedRegion('capacidad-identidad');
     
     localStorage.removeItem('ti_step');
     localStorage.removeItem('ti_screening_answers');
@@ -451,6 +613,11 @@ export default function App() {
     localStorage.removeItem('ti_progress_scores');
     localStorage.removeItem('ti_selected_day_index');
     localStorage.removeItem('ti_is_unveiled');
+    localStorage.removeItem('ti_user_age');
+    localStorage.removeItem('ti_user_goal');
+    localStorage.removeItem('ti_user_xp');
+    localStorage.removeItem('ti_achievements');
+    localStorage.removeItem('ti_selected_region');
   };
 
   const triggerDiagnosisGeneration = async (compiledResults: UserResult[]) => {
@@ -618,11 +785,6 @@ export default function App() {
       ...prev,
       [dayKey]: !prev[dayKey]
     }));
-  };
-
-  // Plain-text Devotional exporter
-  const handleExportText = () => {
-    downloadResults();
   };
 
   // PDF Devotional exporter
@@ -856,6 +1018,67 @@ export default function App() {
                             />
                           </div>
                         </div>
+
+                        {/* Age and Main Goal Grid to keep compact layout */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          <div className="space-y-1.5 sm:col-span-1">
+                            <label className="text-xs text-[#C9A84C] font-mono uppercase tracking-wider font-semibold flex items-center gap-1.5">
+                              <Calendar className="w-3.5 h-3.5" /> Edad
+                            </label>
+                            <input 
+                              type="number" 
+                              required
+                              min="1"
+                              max="120"
+                              value={userAge}
+                              onChange={(e) => setUserAge(e.target.value)}
+                              placeholder="Años" 
+                              className="w-full bg-[#202020] border border-white/5 rounded-xl pl-4 pr-4 py-3 text-sm focus:outline-none focus:border-[#C9A84C] text-white transition-all focus:bg-[#252525]"
+                            />
+                          </div>
+
+                          <div className="space-y-1.5 sm:col-span-2">
+                            <label className="text-xs text-[#C9A84C] font-mono uppercase tracking-wider font-semibold flex items-center gap-1.5">
+                              <Compass className="w-3.5 h-3.5" /> Objetivo Principal
+                            </label>
+                            <select 
+                              required
+                              value={userGoal}
+                              onChange={(e) => setUserGoal(e.target.value)}
+                              className="w-full bg-[#202020] border border-white/5 rounded-xl px-3 py-3 text-sm focus:outline-none focus:border-[#C9A84C] text-white transition-all"
+                            >
+                              <option value="" disabled>Selecciona tu misión...</option>
+                              <option value="Superar el autosabotaje y procrastinación">Superar el autosabotaje</option>
+                              <option value="Sanar mi valor personal e identidad">Sanar mi valor personal</option>
+                              <option value="Romper el pánico al fracaso y perfeccionismo">Romper el pánico al fracaso</option>
+                              <option value="Alinear mis finanzas con la abundancia">Alinear mis finanzas</option>
+                              <option value="Integrar sanamente mis relaciones">Integrar mis relaciones</option>
+                              <option value="Vivir sin culpa de descanso y autoreproche">Descansar sin culpa</option>
+                              <option value="Descubrir mi propósito de vida y Reino">Descubrir mi propósito</option>
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Dynamic Responsive Character Badge Preview */}
+                      <div className="bg-[#0A0A0A] border border-[#C9A84C]/15 rounded-2xl p-4 space-y-2 relative overflow-hidden transition-all hover:border-[#C9A84C]/35">
+                        <div className="absolute right-2 top-2 text-[#C9A84C]/10 pointer-events-none">
+                          <Compass className="w-16 h-16" />
+                        </div>
+                        <span className="text-[9px] tracking-[0.2em] font-mono text-[#C9A84C] block uppercase font-bold">FICHA DE CERTIFICACIÓN TEMPORAL</span>
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <h4 className="text-sm font-bold text-white font-serif">{userName ? `Explorador ${userName}` : 'Explorador sin nombre'}</h4>
+                            <p className="text-[10px] text-white/50">{userAge ? `${userAge} años` : 'Edad no definida'} • Misión: {userGoal ? userGoal : 'Encontrar la verdad'}</p>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-[10px] font-bold bg-[#C9A84C]/10 text-[#C9A84C] border border-[#C9A84C]/20 px-2 py-0.5 rounded-full font-mono">Lvl 1: Despierto 👁</span>
+                          </div>
+                        </div>
+                        <div className="w-full bg-white/5 h-1 rounded-full overflow-hidden mt-1">
+                          <div className="bg-[#C9A84C] h-full w-[25%]" />
+                        </div>
+                        <p className="text-[9px] text-white/30 italic">✓ +25 XP iniciales serán otorgados al iniciar la exploración.</p>
                       </div>
 
                       {/* Terms Acceptance */}
@@ -915,135 +1138,295 @@ export default function App() {
               </motion.div>
             )}
 
-            {/* STEP 2: SCREENING (CAPA 1) */}
+            {/* STEP 2: SCREENING (CAPA 1) - LA EXPEDICIÓN DEL TERRITORIO INTERIOR */}
             {step === 'screening' && (
               <motion.div
                 key="screening-pane"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                className="space-y-6"
+                initial={{ opacity: 0, scale: 0.98 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.98 }}
+                className="space-y-6 max-w-6xl mx-auto"
               >
-                <div className="text-center max-w-xl mx-auto space-y-2">
-                  <span className="text-[#C9A84C] font-mono text-xs uppercase tracking-widest font-semibold">Capa 1: Rastreo de Bloques Cognitivos</span>
-                  <p className="text-white/60 text-xs">Responde de manera intuitiva y honesta según resuena en tu vida cotidiana.</p>
-                </div>
-
-                {/* Pastoral Companion Speech Bubble Banner */}
-                <div className="flex gap-4 bg-[#141414] border border-white/5 p-4 rounded-2xl max-w-2xl mx-auto items-start transition-all">
-                  <div className="w-10 h-10 rounded-full bg-[#C9A84C]/10 border border-[#C9A84C]/25 flex items-center justify-center text-[#C9A84C] flex-shrink-0 relative mt-0.5">
-                    <Heart className="w-5 h-5 text-[#C9A84C]" />
-                    <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border border-[#121212] rounded-full animate-pulse" />
+                {/* Adventure Top HUD bar */}
+                <div className="bg-[#121212]/95 border border-[#C9A84C]/25 rounded-2xl p-4 flex flex-col sm:flex-row justify-between items-center gap-4 shadow-xl relative overflow-hidden">
+                  <div className="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-l from-[#C9A84C]/5 to-transparent pointer-events-none" />
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#C9A84C] to-yellow-600 text-black flex items-center justify-center font-bold text-xl shadow-lg font-mono">
+                      {getExploradorLevel(userXp).lvl}
+                    </div>
+                    <div>
+                      <h4 className="text-white text-[10px] font-mono uppercase tracking-[0.2em] font-bold">Rango de Exploración</h4>
+                      <p className="text-[#C9A84C] font-semibold text-sm font-sans flex items-center gap-1.5">{getExploradorLevel(userXp).title}</p>
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <h4 className="text-[11px] font-bold text-[#C9A84C] uppercase tracking-wide font-mono">Acompañamiento De Fe</h4>
-                    <p className="text-xs sm:text-sm text-white/75 leading-relaxed italic font-sans">
-                      {screeningList[screeningIndex]?.id === 'capacidad-identidad' && `Hola ${userName}. Exploremos si tiendes a dudar de tus capacidades innatas o temes el fracaso público.`}
-                      {screeningList[screeningIndex]?.id === 'merecimiento-vinculo' && `Comprendo, ${userName}. Siguiente, veamos si tu mente aguarda por desgracias cuando todo marcha bien.`}
-                      {screeningList[screeningIndex]?.id === 'control-entorno' && `Analicemos qué tan pesada sientes la carga de intentar manejar todas las variables con tus fuerzas, ${userName}.`}
-                      {screeningList[screeningIndex]?.id === 'rendimiento-logro' && `Evaluemos con qué frecuencia mides tu valor basándote exclusivamente en tu productividad secular, ${userName}.`}
-                      {screeningList[screeningIndex]?.id === 'relaciones-poder' && `Observemos cómo experimentas el conflicto interpersonal y el temor a fijar límites sanos.`}
-                      {screeningList[screeningIndex]?.id === 'cuerpo-salud' && `Indaguemos si te permites descansar sin que el yugo de la culpa opaque tu paz.`}
-                      {screeningList[screeningIndex]?.id === 'espiritualidad-trascendencia' && `Exploremos la vivencia profunda de tu vinculación eterna y trascendencia con Dios en la rutina diaria.`}
-                      {screeningList[screeningIndex]?.id === 'tiempo-futuro' && `Analicemos tu relación con el tiempo y si te angustias al percibir que cada decisión es irreversible.`}
-                      {screeningList[screeningIndex]?.id === 'genero-identidad-social' && `Evaluemos si consideras que tus antecedentes de cuna o demográficos condicionan tu destino.`}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="bg-[#181818] border border-white/5 p-8 sm:p-10 rounded-3xl max-w-2xl mx-auto text-center space-y-6 shadow-inner relative overflow-hidden">
-                  <div className="absolute top-0 left-0 w-2 h-full bg-[#C9A84C]" />
                   
-                  <span className="text-[#C9A84C]/50 font-mono text-xs uppercase">Afirmación {screeningIndex + 1} de 9</span>
-                  
-                  <h3 className="text-xl sm:text-2xl font-semibold text-white tracking-tight leading-relaxed max-w-xl mx-auto italic font-sans">
-                    "{screeningList[screeningIndex]?.screeningPhrase}"
-                  </h3>
+                  {/* XP Progress Bar */}
+                  <div className="w-full sm:w-64 space-y-1">
+                    <div className="flex justify-between text-[10px] font-mono text-white/40 font-bold">
+                      <span>XP: {userXp} / {getExploradorLevel(userXp).nextXp}</span>
+                      <span>Explorado: {Object.keys(screeningAnswers).length}/9 regiones</span>
+                    </div>
+                    <div className="w-full bg-white/5 h-2 rounded-full overflow-hidden border border-white/5">
+                      <div 
+                        className="bg-gradient-to-r from-yellow-600 to-[#C9A84C] h-full transition-all duration-500" 
+                        style={{ width: `${Math.min(100, (userXp / getExploradorLevel(userXp).nextXp) * 100)}%` }}
+                      />
+                    </div>
+                  </div>
 
-                  <div className="text-xs text-[#C9A84C] border border-[#C9A84C]/10 bg-[#C9A84C]/5 px-4 py-2 rounded-full inline-block font-medium">
-                    Área evaluada: {screeningList[screeningIndex]?.title}
+                  <div className="flex items-center gap-2 bg-[#1C1C1C] border border-white/5 px-4 py-2 rounded-xl">
+                    <Flame className="w-4 h-4 text-amber-500 animate-pulse fill-amber-500/10" />
+                    <span className="text-xs font-bold text-white/90 font-mono">Fase 1: Mapeo</span>
                   </div>
                 </div>
 
-                {/* Likert Scale or Conversational Pastoral Response Section */}
-                <div className="max-w-2xl mx-auto space-y-3">
-                  <AnimatePresence mode="wait">
-                    {!isAnswering ? (
-                      <motion.div 
-                        key="likert-grid"
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        className="space-y-3"
-                      >
-                        <p className="text-center text-xs text-white/40 uppercase tracking-widest font-mono">Selecciona tu nivel de afinación:</p>
-                        <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
-                          {[
-                            { val: 1, desc: 'Nunca', label: '1. Nunca me pasa' },
-                            { val: 2, desc: 'Rara vez', label: '2. Rara vez' },
-                            { val: 3, desc: 'A veces', label: '3. A veces' },
-                            { val: 4, desc: 'Con frecuencia', label: '4. Con frecuencia' },
-                            { val: 5, desc: 'Completamente', label: '5. Me describe por completo' }
-                          ].map((opt) => (
-                            <button
-                              key={opt.val}
-                              id={`likert-btn-${opt.val}`}
-                              onClick={() => handleScreeningAnswer(opt.val)}
-                              className="bg-[#161616] border border-white/5 hover:border-[#C9A84C] p-4 rounded-xl text-center group transition-all duration-200 cursor-pointer hover:bg-[#C9A84C]/5 active:scale-95"
-                            >
-                              <span className="block text-lg font-bold text-white/30 group-hover:text-[#C9A84C] transition-colors mb-1">{opt.val}</span>
-                              <span className="block text-xs font-semibold text-white/70 group-hover:text-white transition-colors">{opt.desc}</span>
-                            </button>
-                          ))}
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+                  {/* Left-ish Panel: The 9 Regions Interactive Constellation (Col-span 7) */}
+                  <div className="lg:col-span-7 bg-[#121212] border border-white/5 rounded-3xl p-6 flex flex-col justify-between space-y-6 shadow-2xl relative overflow-hidden">
+                    {/* Atmospheric lines drawing or abstract pattern */}
+                    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(201,168,76,0.06)_0%,rgba(0,0,0,0)_80%)] pointer-events-none" />
+                    
+                    <div className="space-y-1 relative z-10">
+                      <span className="text-[10px] tracking-[0.2em] font-mono text-[#C9A84C] uppercase block font-bold">Planisferio Mental</span>
+                      <h3 className="text-lg font-bold text-white tracking-tight">El Trazado de las 9 Regiones</h3>
+                      <p className="text-xs text-white/50">Haz clic en cualquier región para descifrar la fortaleza de mentira y cimentar la verdad de filiación.</p>
+                    </div>
+
+                    {/* Constellation Nodes Grid */}
+                    <div className="grid grid-cols-3 gap-3 relative z-10 py-4">
+                      {[
+                        { id: 'capacidad-identidad', title: 'Capacidad & Identidad', icon: Brain, desc: 'Duda sobre valor innato.' },
+                        { id: 'merecimiento-vinculo', title: 'Merecimiento & Vínculo', icon: Heart, desc: 'Terror al rechazo imprevisto.' },
+                        { id: 'control-entorno', title: 'Control del Entorno', icon: Shield, desc: 'Lucha por dominar el mañana.' },
+                        { id: 'rendimiento-logro', title: 'Rendimiento & Logro', icon: Activity, desc: 'Medir el alma por obras.' },
+                        { id: 'relaciones-poder', title: 'Relaciones & Poder', icon: Users, desc: 'Falta de límites por pánico.' },
+                        { id: 'cuerpo-salud', title: 'Cuerpo & Descanso', icon: Flame, desc: 'Culpa asociada al ocio sacro.' },
+                        { id: 'espiritualidad-trascendencia', title: 'Espiritualidad', icon: Sparkles, desc: 'Cercanía paternal divina.' },
+                        { id: 'tiempo-futuro', title: 'Tiempo & Futuro', icon: Clock, desc: 'Pánico a la irreversible elección.' },
+                        { id: 'genero-identidad-social', title: 'Linaje & Origen', icon: Briefcase, desc: 'Condición social de cuna.' }
+                      ].map((reg, idx) => {
+                        const score = screeningAnswers[reg.id];
+                        const isSelected = currentSelectedRegion === reg.id;
+                        const isCompleted = score !== undefined;
+                        
+                        const IconComponent = reg.icon;
+
+                        return (
+                          <div 
+                            key={reg.id}
+                            onClick={() => {
+                              if (!isAnswering) {
+                                setCurrentSelectedRegion(reg.id);
+                              }
+                            }}
+                            className={`p-3 rounded-2xl border text-left transition-all relative overflow-hidden group cursor-pointer flex flex-col justify-between min-h-[110px] ${
+                              isSelected 
+                                ? 'bg-[#C9A84C]/10 border-[#C9A84C] shadow-[0_0_15px_rgba(201,168,76,0.15)] ring-1 ring-[#C9A84C]/30' 
+                                : isCompleted
+                                ? 'bg-[#181818] border-emerald-500/30 hover:border-emerald-500/60'
+                                : 'bg-[#161616] border-white/5 hover:border-white/10 hover:bg-[#1A1A1A]'
+                            }`}
+                          >
+                            <div className="flex justify-between items-start">
+                              <div className={`p-2 rounded-xl transition-all ${
+                                isSelected 
+                                  ? 'bg-[#C9A84C]/20 text-[#C9A84C]' 
+                                  : isCompleted
+                                  ? 'bg-emerald-500/10 text-emerald-400'
+                                  : 'bg-white/5 text-white/40'
+                              }`}>
+                                <IconComponent className="w-4 h-4" />
+                              </div>
+                              <span className="text-[10px] uppercase font-mono font-bold text-white/25">Z-{idx+1}</span>
+                            </div>
+
+                            <div className="space-y-0.5 mt-2">
+                              <h4 className="text-[11px] font-bold text-white leading-tight font-sans tracking-tight">{reg.title}</h4>
+                              <p className="text-[9px] text-white/40 line-clamp-1">{reg.desc}</p>
+                            </div>
+
+                            {/* Node Status Badge */}
+                            <div className="mt-1 pb-0.5 flex items-center justify-between">
+                              <span className={`text-[8px] uppercase font-mono font-semibold tracking-wider flex items-center gap-1 ${
+                                isCompleted ? 'text-emerald-400' : 'text-amber-500/85'
+                              }`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${isCompleted ? 'bg-emerald-400' : 'bg-amber-500 animate-pulse'}`} />
+                                {isCompleted ? 'Explorado' : 'Neblina'}
+                              </span>
+                              {isCompleted && (
+                                <span className="text-[9px] font-mono font-bold text-[#C9A84C] bg-[#C9A84C]/15 border border-[#C9A84C]/15 px-1.5 rounded">
+                                  {score}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div className="flex items-center gap-1.5 border-t border-white/5 pt-4 text-[10px] text-white/40 font-mono uppercase">
+                      <Info className="w-3.5 h-3.5 text-[#C9A84C]" />
+                      <span>Completa las 9 regiones para develar las puertas del inconsciente.</span>
+                    </div>
+                  </div>
+
+                  {/* Right Panel: The Quest details and options (Col-span 5) */}
+                  <div className="lg:col-span-5 bg-[#161616] border border-[#C9A84C]/25 rounded-3xl p-6 flex flex-col justify-between space-y-6 shadow-2xl relative overflow-hidden">
+                    {/* Ambient light inside card */}
+                    <div className="absolute top-0 right-0 w-24 h-24 rounded-full bg-[#C9A84C]/5 blur-2xl pointer-events-none" />
+
+                    <div className="space-y-4">
+                      {/* Active region head */}
+                      <div className="flex items-center gap-3">
+                        <div className="p-2.5 rounded-xl bg-[#C9A84C]/10 border border-[#C9A84C]/25 text-[#C9A84C]">
+                          {(() => {
+                            const keys = Object.keys(bloquesDiagnostico);
+                            const activeIndex = keys.indexOf(currentSelectedRegion);
+                            return <span className="text-xs font-bold font-mono">ZONA {activeIndex !== -1 ? activeIndex + 1 : 1}</span>;
+                          })()}
                         </div>
-                      </motion.div>
-                    ) : (
-                      <motion.div
-                        key="conversational-feedback"
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.95 }}
-                        className="bg-[#1C1C1C]/90 border border-[#C9A84C]/35 p-6 rounded-2xl flex flex-col items-center justify-center gap-4 text-center max-w-xl mx-auto relative overflow-hidden shadow-2xl"
-                      >
-                        {/* Dynamic Progress Bar */}
-                        <div 
-                          className="absolute inset-x-0 bottom-0 h-1 bg-gradient-to-r from-[#C9A84C] to-yellow-600"
-                          style={{
-                            width: barWidth,
-                            transition: 'width 1.75s linear'
-                          }}
-                        />
-                        <div className="w-12 h-12 rounded-full bg-[#C9A84C]/10 border border-[#C9A84C]/20 flex items-center justify-center text-[#C9A84C]">
-                          <Sparkles className="w-6 h-6 text-[#C9A84C] animate-pulse" />
+                        <div>
+                          <h4 className="text-white font-bold text-sm tracking-tight font-sans">
+                            {bloquesDiagnostico[currentSelectedRegion as keyof typeof bloquesDiagnostico]?.title || 'Capacidad & Identidad'}
+                          </h4>
+                          <span className="text-[10px] font-mono text-[#C9A84C] uppercase tracking-widest font-semibold block">Rastreo de Activación</span>
                         </div>
-                        <p className="text-base font-medium font-sans text-white italic leading-relaxed px-2">
-                          "{answeringFeedback}"
+                      </div>
+
+                      {/* Companion speech bubble inside panel to guide them */}
+                      <div className="bg-[#101010] border border-white/5 p-4 rounded-2xl flex gap-3 items-start relative">
+                        <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-[#C9A84C] animate-ping" />
+                        <div className="w-8 h-8 rounded-full bg-[#C9A84C]/10 border border-[#C9A84C]/25 flex items-center justify-center text-[#C9A84C] flex-shrink-0 mt-0.5">
+                          <Heart className="w-4 h-4 text-[#C9A84C]" />
+                        </div>
+                        <div className="space-y-1">
+                          <span className="text-[9px] uppercase font-mono tracking-wider text-[#C9A84C] font-bold">Consejería del Territorio</span>
+                          <p className="text-xs text-white/80 italic leading-relaxed font-sans">
+                            {currentSelectedRegion === 'capacidad-identidad' && `Hola ${userName}, descifremos la fortaleza de mentira de la incapacidad. ¿Temes no estar a la altura en público?`}
+                            {currentSelectedRegion === 'merecimiento-vinculo' && `Comprendo el temor, ${userName}. Siguiente paso: ¿aguarda tu mente que un rechazo o catástrofe imprevista ocurra para cobrarte facturas?`}
+                            {currentSelectedRegion === 'control-entorno' && `Analicemos qué tan obsesivo se vuelve el deseo de dominar lo incontrolable pretendiendo sostener todo en tus manos.`}
+                            {currentSelectedRegion === 'rendimiento-logro' && `Evaluemos si condicionas el valor intrínseco de tu alma a la acumulación y volumen de tus trofeos terrenales, ${userName}.`}
+                            {currentSelectedRegion === 'relaciones-poder' && `Indaguemos en el pánico a ser vulnerable o a colocar fronteras de paz en tus relaciones cotidianas por temor de abandono.`}
+                            {currentSelectedRegion === 'cuerpo-salud' && `Detrás de tu cansancio físico prolongado, ¿por qué sientes que reposar sin culpabilidad es un pecado del cual arrepentirse?`}
+                            {currentSelectedRegion === 'espiritualidad-trascendencia' && `¿Vivencias verdaderamente una filiación de gracia o percibes la lejanía divina como un veredicto frío?`}
+                            {currentSelectedRegion === 'tiempo-futuro' && `El tiempo corre. ¿Te paralizas ante la idea de tomar una sendera irreversible sintiendo escasez de oportunidades?`}
+                            {currentSelectedRegion === 'genero-identidad-social' && `¿Consideras que tus marcas heredadas de cuna o demográficas limitan eternamente tu unción de gracia?`}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Diagnostic Phrase display board */}
+                      <div className="bg-[#0A0A0A] border border-white/5 p-5 rounded-2xl relative overflow-hidden text-center space-y-1.5 min-h-[90px] flex flex-col justify-center">
+                        <div className="absolute top-0 inset-x-0 h-[1.5px] bg-gradient-to-r from-transparent via-[#C9A84C]/40 to-transparent" />
+                        <span className="text-[9px] uppercase font-mono text-white/30 tracking-widest font-semibold block">Declaración de Resonancia</span>
+                        <p className="text-sm sm:text-base text-white font-medium leading-relaxed font-sans italic">
+                          "{bloquesDiagnostico[currentSelectedRegion as keyof typeof bloquesDiagnostico]?.screeningPhrase}"
                         </p>
-                        <span className="text-xs text-white/40 font-mono flex items-center gap-1.5">
-                          <Clock className="w-3.5 h-3.5" /> Estudiando la vibración del alma...
-                        </span>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
+                      </div>
+                    </div>
 
-                {/* Back Button */}
-                {!isAnswering && (
-                  <div className="flex justify-center">
-                    <button 
-                      onClick={() => {
-                        if (screeningIndex > 0) {
-                          setScreeningIndex(prev => prev - 1);
-                        } else {
-                          setStep('welcome');
-                        }
-                      }}
-                      className="flex items-center gap-2 text-white/55 hover:text-white text-sm transition-colors cursor-pointer"
-                    >
-                      <ArrowLeft className="w-4 h-4" /> Regresar al paso anterior
-                    </button>
+                    {/* Likert Selection */}
+                    <div className="space-y-4">
+                      <AnimatePresence mode="wait">
+                        {!isAnswering ? (
+                          <motion.div 
+                            key="likert-controls"
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            className="space-y-2.5"
+                          >
+                            <span className="text-[10px] font-mono uppercase tracking-widest text-white/30 block ml-1 font-bold">Graduación del Desafío</span>
+                            <div className="grid grid-cols-5 gap-2">
+                              {[
+                                { val: 1, desc: 'Nunca' },
+                                { val: 2, desc: 'Rara vez' },
+                                { val: 3, desc: 'A veces' },
+                                { val: 4, desc: 'A menudo' },
+                                { val: 5, desc: 'Total' }
+                              ].map((opt) => {
+                                const currentScore = screeningAnswers[currentSelectedRegion];
+                                const isSelectedOption = currentScore === opt.val;
+                                
+                                return (
+                                  <button
+                                    key={opt.val}
+                                    id={`likert-btn-${opt.val}`}
+                                    onClick={() => handleMapRegionAnswer(currentSelectedRegion, opt.val)}
+                                    className={`py-3 px-1 rounded-xl text-center group transition-all duration-200 cursor-pointer border ${
+                                      isSelectedOption
+                                        ? 'bg-[#C9A84C] text-[#0A0A0A] border-[#C9A84C] font-bold shadow-[0_0_10px_rgba(201,168,76,0.25)] scale-[1.03]'
+                                        : 'bg-[#1C1C1C] border-white/5 hover:border-[#C9A84C]/35 hover:bg-[#C9A84C]/5 text-white'
+                                    }`}
+                                  >
+                                    <span className={`block text-sm font-bold leading-none mb-1 ${
+                                      isSelectedOption ? 'text-[#0A0A0A]' : 'text-white/40 group-hover:text-[#C9A84C]'
+                                    }`}>{opt.val}</span>
+                                    <span className="block text-[8px] font-bold tracking-tight uppercase leading-none opacity-80">{opt.desc}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                            <div className="flex justify-between items-center text-[10px] font-mono text-white/30 px-1 mt-1">
+                              <span>← No resuena</span>
+                              <span>Resuena de lleno →</span>
+                            </div>
+                          </motion.div>
+                        ) : (
+                          <motion.div
+                            key="counseling-feedback"
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            className="bg-[#1C1C1C]/90 border border-[#C9A84C]/35 p-5 rounded-2xl flex flex-col items-center justify-center gap-3 text-center relative overflow-hidden shadow-2xl min-h-[140px]"
+                          >
+                            {/* Dynamic Progress Bar */}
+                            <div 
+                              className="absolute inset-x-0 bottom-0 h-1 bg-gradient-to-r from-gradient to-yellow-600"
+                              style={{
+                                width: barWidth,
+                                transition: 'width 2.15s linear',
+                                background: '#C9A84C'
+                              }}
+                            />
+                            <div className="w-10 h-10 rounded-full bg-[#C9A84C]/10 border border-[#C9A84C]/25 flex items-center justify-center text-[#C9A84C]">
+                              <Sparkles className="w-5 h-5 text-[#C9A84C] animate-pulse" />
+                            </div>
+                            <p className="text-xs sm:text-sm text-white italic leading-relaxed px-1">
+                              "{answeringFeedback}"
+                            </p>
+                            <span className="text-[10px] text-white/40 font-mono flex items-center gap-1">
+                              <Clock className="w-3" /> Mapeando vibraciones de la creencia...
+                            </span>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+
+                    {/* Navigation inside card */}
+                    <div className="flex justify-between items-center pt-2 border-t border-white/5 relative z-10">
+                      <button 
+                        onClick={() => {
+                          const keys = Object.keys(bloquesDiagnostico);
+                          const currentIndex = keys.indexOf(currentSelectedRegion);
+                          if (currentIndex > 0) {
+                            setCurrentSelectedRegion(keys[currentIndex - 1]);
+                          } else {
+                            setStep('welcome');
+                          }
+                        }}
+                        className="flex items-center gap-1.5 text-white/50 hover:text-white text-xs transition-colors cursor-pointer"
+                      >
+                        <ArrowLeft className="w-3.5 h-3.5" /> Atrás
+                      </button>
+
+                      <span className="text-[10px] font-mono text-white/25 uppercase font-bold">
+                        Zona {Object.keys(screeningAnswers).length} de 9 Cartografiadas
+                      </span>
+                    </div>
+
                   </div>
-                )}
+                </div>
               </motion.div>
             )}
 
@@ -1074,141 +1457,238 @@ export default function App() {
               </motion.div>
             )}
 
-            {/* STEP 4: DEEP DIVE (CAPA 2) */}
+            {/* STEP 4: DEEP DIVE (CAPA 2) - EL DESCENSO DE DESCUBRIMIENTO */}
             {step === 'deep_dive' && (
               <motion.div
                 key="deep-dive-pane"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                className="space-y-6"
+                initial={{ opacity: 0, scale: 0.98 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.98 }}
+                className="space-y-6 max-w-6xl mx-auto"
               >
-                <div className="text-center max-w-xl mx-auto space-y-2">
-                  <span className="text-[#C9A84C] font-mono text-xs uppercase tracking-widest font-semibold">Capa 2: Diagnóstico de Creencias Específicas</span>
-                  <p className="text-white/60 text-xs">
-                    Hemos detectado activación en <strong>{activeBlocks.length} bloques cognitivos</strong>. Responde con total honestidad a estas afirmaciones internas escritas de forma íntima.
-                  </p>
-                </div>
-
-                {/* Progress bar specific to deep dive */}
-                <div className="max-w-xl mx-auto bg-white/5 px-4 py-2.5 rounded-xl border border-white/5 flex justify-between items-center text-xs font-mono">
-                  <span className="text-[#C9A84C]">Bloque evaluando: <strong className="text-white font-sans">{deepDiveQuestions[deepDiveIndex]?.bloque}</strong></span>
-                  <span className="text-white/40">Afirmación {deepDiveIndex + 1} de {deepDiveQuestions.length}</span>
-                </div>
-
-                {/* Clinical-Pastoral Companion Speech Bubble Banner */}
-                <div className="flex gap-4 bg-[#141414] border border-white/5 p-4 rounded-2xl max-w-2xl mx-auto items-start transition-all">
-                  <div className="w-10 h-10 rounded-full bg-[#C9A84C]/10 border border-[#C9A84C]/25 flex items-center justify-center text-[#C9A84C] flex-shrink-0 relative mt-0.5">
-                    <BookOpen className="w-5 h-5 text-[#C9A84C]" />
-                    <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border border-[#121212] rounded-full animate-pulse" />
+                {/* Descenso Top HUD Bar */}
+                <div className="bg-[#121212]/95 border border-[#C9A84C]/20 rounded-2xl p-4 flex flex-col sm:flex-row justify-between items-center gap-4 shadow-xl relative overflow-hidden">
+                  <div className="absolute left-0 top-0 bottom-0 w-2 h-full bg-[#C9A84C]/80" />
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-orange-950/45 border border-orange-500/30 text-orange-400 flex items-center justify-center font-bold text-lg font-mono">
+                      {getExploradorLevel(userXp).lvl}
+                    </div>
+                    <div>
+                      <h4 className="text-white text-[10px] font-mono uppercase tracking-[0.2em] font-bold">Nivel de Descenso</h4>
+                      <p className="text-[#C9A84C] font-semibold text-xs font-sans">Sondeando Creencias Sepultadas</p>
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <h4 className="text-[11px] font-bold text-[#C9A84C] uppercase tracking-wide font-mono">Consejero Pastoral</h4>
-                    <p className="text-xs sm:text-md text-white/75 leading-relaxed italic font-sans animate-[fadeIn_0.5s_ease-out]">
-                      "Sondeando el bloque: <strong className="text-white">{deepDiveQuestions[deepDiveIndex]?.bloque}</strong>. Mira esta afirmación e identifica honestamente cómo se manifiesta en tu vida real."
-                    </p>
+
+                  <div className="flex items-center gap-4">
+                    {/* Progress indicators */}
+                    <div className="text-right font-mono">
+                      <span className="text-white/40 text-[10px] block font-bold uppercase">Pregunta Activa</span>
+                      <span className="text-white font-bold text-xs">Afirmación {deepDiveIndex + 1} de {deepDiveQuestions.length}</span>
+                    </div>
+                    <div className="h-8 w-[1px] bg-white/10" />
+                    <div className="text-right font-mono">
+                      <span className="text-white/40 text-[10px] block font-bold uppercase">Sectores Abismales</span>
+                      <span className="text-[#C9A84C] font-bold text-xs">{activeBlocks.length} Bloques Detectados</span>
+                    </div>
                   </div>
                 </div>
 
-                <div className="bg-[#181818]/60 border border-white/5 p-8 sm:p-10 rounded-3xl max-w-2xl mx-auto text-center space-y-6 shadow-inner relative overflow-hidden">
-                  <div className="absolute top-0 right-0 w-3 h-3 bg-[#C9A84C] animate-pulse rounded-bl-lg" />
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
                   
-                  <span className="text-white/40 font-mono text-xs uppercase">La Voz del Inconsciente</span>
-                  
-                  <h3 className="text-xl sm:text-2xl font-semibold text-[#F3F4F6] tracking-tight leading-relaxed max-w-xl mx-auto py-2 font-display">
-                    "{deepDiveQuestions[deepDiveIndex]?.afirmacionTest}"
-                  </h3>
-                </div>
+                  {/* Left Column (Col-span 8): Active Quest Affirmation & Heart Dial (Tri-State buttons) */}
+                  <div className="lg:col-span-8 flex flex-col justify-between space-y-6">
+                    
+                    {/* Primary Affirmation Board */}
+                    <div className="bg-[#121212] border border-white/5 p-8 sm:p-10 rounded-3xl relative overflow-hidden shadow-2xl flex-grow flex flex-col justify-center text-center space-y-4">
+                      {/* Ambient background glow */}
+                      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(234,88,12,0.04)_0%,rgba(0,0,0,0)_70%)] pointer-events-none" />
+                      <div className="absolute top-0 inset-x-0 h-[1.5px] bg-gradient-to-r from-transparent via-[#C9A84C]/25 to-transparent" />
+                      
+                      <span className="text-white/30 font-mono text-[10px] uppercase tracking-[0.2em] font-semibold block">La Voz del Inconsciente</span>
+                      
+                      <h3 className="text-lg sm:text-2xl font-bold text-white tracking-tight leading-relaxed max-w-2xl mx-auto italic font-sans py-4">
+                        "{deepDiveQuestions[deepDiveIndex]?.afirmacionTest}"
+                      </h3>
 
-                {/* Tri-state Response Buttons or Conversational Feedback Section */}
-                <div className="max-w-xl mx-auto">
-                  <AnimatePresence mode="wait">
-                    {!isAnswering ? (
-                      <motion.div 
-                        key="deep-dive-grid"
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        className="grid grid-cols-1 sm:grid-cols-3 gap-3"
-                      >
-                        <button
-                          key="dive-yes"
-                          id="deep-dive-yes"
-                          onClick={() => handleDeepDiveAnswer(2)}
-                          className="bg-[#C9A84C] hover:bg-[#C9A84C]/90 text-[#0D0D0D] font-bold p-4 rounded-xl text-center hover:scale-[1.02] active:scale-95 transition-all cursor-pointer shadow-lg shadow-[#C9A84C]/10"
-                        >
-                          <span className="block text-sm">Prácticamente Sí</span>
-                          <span className="text-[10px] opacity-80 block font-normal text-[#0d0d0d]">Siento total afinidad</span>
-                        </button>
+                      <div className="inline-flex items-center gap-2 bg-[#C9A84C]/10 border border-[#C9A84C]/10 px-4 py-1.5 rounded-full text-xs text-[#C9A84C] font-semibold w-fit mx-auto self-center">
+                        <Lock className="w-3.5 h-3.5" />
+                        <span>Sectores: {deepDiveQuestions[deepDiveIndex]?.bloque}</span>
+                      </div>
+                    </div>
 
-                        <button
-                          key="dive-sometimes"
-                          id="deep-dive-sometimes"
-                          onClick={() => handleDeepDiveAnswer(1)}
-                          className="bg-[#1C1C1C] border border-white/10 text-white hover:border-[#C9A84C] font-bold p-4 rounded-xl text-center hover:scale-[1.02] active:scale-95 transition-all cursor-pointer"
-                        >
-                          <span className="block text-sm">A veces</span>
-                          <span className="text-[10px] text-white/50 block font-normal">Ocurre intermitente</span>
-                        </button>
+                    {/* Highly Stylized Heart Dial responses */}
+                    <div className="bg-[#121212] border border-white/5 p-6 rounded-3xl space-y-3 shadow-xl">
+                      <span className="text-[10px] font-mono uppercase tracking-widest text-white/35 block ml-1 font-bold">Graduación en tu Espíritu</span>
+                      <AnimatePresence mode="wait">
+                        {!isAnswering ? (
+                          <motion.div 
+                            key="deep-dive-selection"
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            className="grid grid-cols-1 sm:grid-cols-3 gap-3"
+                          >
+                            <button
+                              key="dive-yes"
+                              id="deep-dive-yes"
+                              onClick={() => handleDeepDiveAnswer(2)}
+                              className="bg-[#C9A84C] hover:bg-[#C9A84C]/95 text-black font-bold p-4 rounded-xl text-center hover:scale-[1.01] active:scale-95 transition-all cursor-pointer shadow-lg shadow-[#C9A84C]/10 flex flex-col justify-center items-center min-h-[70px]"
+                            >
+                              <span className="text-sm font-extrabold tracking-wide uppercase">Prácticamente Sí</span>
+                              <span className="text-[9px] opacity-75 font-normal block">Siento total y constante afinidad</span>
+                            </button>
 
-                        <button
-                          key="dive-no"
-                          id="deep-dive-no"
-                          onClick={() => handleDeepDiveAnswer(0)}
-                          className="bg-[#161616] border border-white/5 text-white/60 hover:text-white hover:border-red-500/40 font-bold p-4 rounded-xl text-center hover:scale-[1.02] active:scale-95 transition-all cursor-pointer"
-                        >
-                          <span className="block text-sm">En absoluto (No)</span>
-                          <span className="text-[10px] text-white/40 block font-normal">No coincide conmigo</span>
-                        </button>
-                      </motion.div>
-                    ) : (
-                      <motion.div
-                        key="deep-dive-feedback"
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.95 }}
-                        className="bg-[#1C1C1C]/90 border border-[#C9A84C]/35 p-6 rounded-2xl flex flex-col items-center justify-center gap-4 text-center max-w-xl mx-auto relative overflow-hidden shadow-2xl"
-                      >
-                        {/* Dynamic Progress Bar */}
-                        <div 
-                          className="absolute inset-x-0 bottom-0 h-1 bg-gradient-to-r from-[#C9A84C] to-yellow-600"
-                          style={{
-                            width: barWidth,
-                            transition: 'width 1.75s linear'
-                          }}
-                        />
-                        <div className="w-12 h-12 rounded-full bg-[#C9A84C]/10 border border-[#C9A84C]/20 flex items-center justify-center text-[#C9A84C]">
-                          <Sparkles className="w-6 h-6 text-[#C9A84C]" />
+                            <button
+                              key="dive-sometimes"
+                              id="deep-dive-sometimes"
+                              onClick={() => handleDeepDiveAnswer(1)}
+                              className="bg-[#1C1C1C] border border-white/10 text-white hover:border-[#C9A84C]/50 font-bold p-4 rounded-xl text-center hover:scale-[1.01] active:scale-95 transition-all cursor-pointer flex flex-col justify-center items-center min-h-[70px]"
+                            >
+                              <span className="text-sm font-extrabold tracking-wide uppercase">A veces</span>
+                              <span className="text-[9px] text-white/55 font-normal block font-sans">Ocurre de manera intermitente</span>
+                            </button>
+
+                            <button
+                              key="dive-no"
+                              id="deep-dive-no"
+                              onClick={() => handleDeepDiveAnswer(0)}
+                              className="bg-[#161616] border border-white/5 text-white/60 hover:text-white hover:border-red-500/30 font-bold p-4 rounded-xl text-center hover:scale-[1.01] active:scale-95 transition-all cursor-pointer flex flex-col justify-center items-center min-h-[70px]"
+                            >
+                              <span className="text-sm font-extrabold tracking-wide uppercase">En absoluto</span>
+                              <span className="text-[9px] text-white/40 font-normal block">No coincide ni resuena conmigo</span>
+                            </button>
+                          </motion.div>
+                        ) : (
+                          <motion.div
+                            key="deep-dive-feedback"
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            className="bg-[#1C1C1C]/95 border border-[#C9A84C]/35 p-5 rounded-2xl flex flex-col items-center justify-center gap-3 text-center relative overflow-hidden shadow-2xl min-h-[82px]"
+                          >
+                            <div 
+                              className="absolute inset-x-0 bottom-0 h-1"
+                              style={{
+                                width: barWidth,
+                                transition: 'width 2.15s linear',
+                                background: '#C9A84C'
+                              }}
+                            />
+                            <div className="w-10 h-10 rounded-full bg-[#C9A84C]/10 border border-[#C9A84C]/25 flex items-center justify-center text-[#C9A84C]">
+                              <Activity className="w-5 h-5 text-[#C9A84C] animate-pulse" />
+                            </div>
+                            <p className="text-xs sm:text-sm text-white italic leading-relaxed px-2 font-sans">
+                              "{answeringFeedback}"
+                            </p>
+                            <span className="text-[10px] text-[#C9A84C] font-mono flex items-center gap-1.5 animate-pulse uppercase tracking-wider font-semibold">
+                              <Sparkles className="w-3.5 h-3.5" /> Reconfigurando redes neuronales del espíritu...
+                            </span>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+
+                  </div>
+
+                  {/* Right Column (Col-span 4): Pastoral Advisor & Blocks tracking ladder */}
+                  <div className="lg:col-span-4 bg-[#141414] border border-white/5 rounded-3xl p-6 flex flex-col justify-between space-y-6 shadow-2xl relative overflow-hidden">
+                    
+                    <div className="space-y-6">
+                      
+                      {/* Speech speech Advisor */}
+                      <div className="bg-[#101010] border border-white/5 p-4 rounded-2xl flex gap-3 items-start relative">
+                        <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-orange-500 animate-ping" />
+                        <div className="w-8 h-8 rounded-full bg-[#C9A84C]/15 border border-[#C9A84C]/20 flex items-center justify-center text-[#C9A84C] flex-shrink-0 mt-0.5">
+                          <BookOpen className="w-4 h-4 text-[#C9A84C]" />
                         </div>
-                        <p className="text-base font-medium font-sans text-white italic leading-relaxed px-2">
-                          "{answeringFeedback}"
-                        </p>
-                        <span className="text-xs text-[#C9A84C] font-mono flex items-center gap-1.5 animate-pulse">
-                          <Activity className="w-3.5 h-3.5" /> Reconfigurando redes neuronales...
-                        </span>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
+                        <div className="space-y-1">
+                          <span className="text-[9px] uppercase font-mono tracking-wider text-[#C9A84C] font-bold">Consejero de Combate</span>
+                          <p className="text-xs text-white/70 italic leading-relaxed font-sans">
+                            "Mide tus pensamientos a la luz de esta afirmación. No te culpes; solo detectemos el nudo para traer libertad."
+                          </p>
+                        </div>
+                      </div>
 
-                {/* Back Button */}
-                {!isAnswering && (
-                  <div className="flex justify-center hover:translate-x-[-2px] transition-transform">
-                    <button 
-                      onClick={() => {
-                        if (deepDiveIndex > 0) {
-                          setDeepDiveIndex(prev => prev - 1);
-                        } else {
-                          // go back to screening calculated step
-                          setStep('screening');
-                        }
-                      }}
-                      className="flex items-center gap-2 text-white/55 hover:text-white text-sm transition-colors cursor-pointer font-medium"
-                    >
-                      <ArrowLeft className="w-4 h-4" /> Regresar al paso anterior
-                    </button>
+                      {/* Descent checklist tracking */}
+                      <div className="space-y-3">
+                        <span className="text-[10px] font-mono uppercase tracking-[0.1em] text-white/30 block ml-0.5 font-bold">Sendero del Descenso</span>
+                        
+                        <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+                          {activeBlocks.map((blockId, idx) => {
+                            const isCurrent = deepDiveQuestions[deepDiveIndex]?.bloqueId === blockId;
+                            const blockName = bloquesDiagnostico[blockId as keyof typeof bloquesDiagnostico]?.title || blockId;
+                            
+                            // Check if this block questions have been answered or are being answered
+                            // All questions for this block that have index < deepDiveIndex
+                            const blockQuestions = deepDiveQuestions.filter(q => q.bloqueId === blockId);
+                            const isCompleted = blockQuestions.every(q => {
+                              const qIndex = deepDiveQuestions.findIndex(x => x.id === q.id);
+                              return qIndex < deepDiveIndex;
+                            });
+
+                            return (
+                              <div 
+                                key={blockId}
+                                className={`flex items-center gap-3 p-2.5 rounded-xl border transition-all ${
+                                  isCurrent 
+                                    ? 'bg-[#C9A84C]/10 border-[#C9A84C] shadow-md shadow-[#C9A84C]/5' 
+                                    : isCompleted
+                                    ? 'bg-emerald-900/10 border-emerald-500/20 opacity-70'
+                                    : 'bg-[#181818]/40 border-white/5 opacity-40'
+                                }`}
+                              >
+                                {isCompleted ? (
+                                  <div className="w-5 h-5 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 text-xs">
+                                    ✓
+                                  </div>
+                                ) : isCurrent ? (
+                                  <div className="w-5 h-5 rounded-full bg-[#C9A84C]/10 border border-[#C9A84C] flex items-center justify-center text-[#C9A84C] text-[10px] font-bold font-mono animate-pulse">
+                                    {idx + 1}
+                                  </div>
+                                ) : (
+                                  <div className="w-5 h-5 rounded-full bg-white/5 border border-white/5 flex items-center justify-center text-white/30 text-[10px] font-bold font-mono">
+                                    {idx + 1}
+                                  </div>
+                                )}
+                                <div className="space-y-0.5">
+                                  <h5 className="text-[11px] font-bold text-white font-sans">{blockName}</h5>
+                                  <span className="text-[8px] uppercase font-mono tracking-wider text-white/35 block font-bold">
+                                    {isCompleted ? 'Derrumbado' : isCurrent ? 'Sondeando...' : 'Bloqueado'}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                    </div>
+
+                    <div className="flex justify-between items-center border-t border-white/5 pt-4">
+                      {/* Back Button */}
+                      {!isAnswering && (
+                        <button 
+                          onClick={() => {
+                            if (deepDiveIndex > 0) {
+                              setDeepDiveIndex(prev => prev - 1);
+                            } else {
+                              setStep('screening');
+                            }
+                          }}
+                          className="flex items-center gap-1 text-white/45 hover:text-white text-xs transition-colors cursor-pointer font-bold font-mono"
+                        >
+                          <ArrowLeft className="w-3.5 h-3.5" /> Atrás
+                        </button>
+                      )}
+                      
+                      <span className="text-[9px] font-mono text-white/20 uppercase font-bold">
+                        Capa 2 • Expedición Interior
+                      </span>
+                    </div>
+
                   </div>
-                )}
+
+                </div>
               </motion.div>
             )}
 
@@ -1262,7 +1742,6 @@ export default function App() {
                     <Sparkles className="w-10 h-10 text-[#C9A84C] drop-shadow-[0_0_15px_#C9A84C]" />
                   </div>
 
-                  <span className="text-[#C9A84C] font-mono text-xs uppercase tracking-[0.25em] block font-semibold">MINISTERIO DE TRANSFORMACIÓN COGNITIVA</span>
                   <h2 className="text-3xl sm:text-4xl font-bold font-display text-white tracking-tight">
                     Tu Diseño Revelado está Listo
                   </h2>
@@ -2162,138 +2641,4 @@ export default function App() {
       />
     </div>
   );
-
-  // EXPORTER OF THE FULL 8 PHASES DIOCESAN MANUAL (Durable TXT Devotional Book)
-  function downloadResults() {
-    let content = `
-================================================================================
-              TRANSFORMACIÓN INTERIOR • PROGRAMA DE RENOVACIÓN MENTAL
-           "Transformaos por medio de la renovación de vuestro entendimiento"
-                                Romanos 12:2
-================================================================================
-
-Rastreo expedido para: ${userName}
-Perfil registrado: ${userEmail || 'Sin correo electrónico'}
-Fecha de diagnóstico: ${new Date().toLocaleDateString('es-ES')}
-
-================================================================================
-FASE 1 Y 2: IDENTIFICACIÓN Y DIAGNÓSTICO COGNITIVO
-================================================================================
-• Creencia Principal: ${aiDiagnosis?.fase1?.principalBelief || results[0]?.creencia}
-• Temor Raíz Subyacente: ${aiDiagnosis?.fase1?.rootFear || 'Temor a la crítica.'}
-• Emoción Dominante: ${aiDiagnosis?.fase1?.dominantEmotion || 'Insuficiencia o Temor'}
-• Área Vulnerable Afectada: ${aiDiagnosis?.fase1?.affectedArea || 'Identidad / Liderazgo'}
-
-❌ LA MENTIRA RAÍZ DETECTADA:
-   "${aiDiagnosis?.fase2?.rootLie || 'Mi valía y capacidad dependen de mí propio desempeño.'}"
-
-💬 MECANISMO DE AUTOSABOTAJE:
-   "${aiDiagnosis?.fase2?.selfSabotageMechanism || 'Postergación rumiante incesante buscando perfeccionismo.'}"
-
-🔍 COSTOS ESTIMADOS EN TU COGNICIÓN (LAS 4 DIMENSIONES):
-   * En Decisiones:   ${aiDiagnosis?.fase2?.currentCost?.decisions}
-   * En Emociones:    ${aiDiagnosis?.fase2?.currentCost?.emotions}
-   * En Relaciones:   ${aiDiagnosis?.fase2?.currentCost?.relationships}
-   * En Tu Propósito: ${aiDiagnosis?.fase2?.currentCost?.potentialFuture}
-
-================================================================================
-FASE 3 Y 4: RENOVACIÓN BÍBLICA Y NUEVA IDENTIDAD CRISTOCÉNTRICA
-================================================================================
-🛑 LA MENTIRA CARNAL ENFRENTADA:
-   "${aiDiagnosis?.fase3?.mentira || results[0]?.afirmacionTest}"
-
-🟢 LA VERDAD ETERNA SUSTITUTORIA:
-   "${aiDiagnosis?.fase3?.verdadBiblica || results[0]?.verdad}"
-
-📖 VERSÍCULO ANCLERO SELECCIONADO:
-   "${aiDiagnosis?.fase3?.versiculo?.texto || results[0]?.versiculos[0]?.txt}"
-   — Cita: ${aiDiagnosis?.fase3?.versiculo?.referencia || results[0]?.versiculos[0]?.ref}
-
-🔥 RECOMENDACIÓN DE ENTRENAMIENTO ESPIRITUAL:
-   ${aiDiagnosis?.fase3?.aplicacion || results[0]?.espiritu}
-
-✨ PRINCIPAL CONFESIÓN DE IDENTIDAD (FASE 4 - PROCLAMAR CON VOZ AUDIBLE):
-   "${aiDiagnosis?.fase4?.declaracionIdentidad || results[0]?.declaracion}"
-
-================================================================================
-FASE 5: HOJA DE RUTA SEMANALES DE REESTRUCTURACIÓN NEURO-ESPIRITUAL
-================================================================================
-• SEMANA 1: Consciencia Mental de la Mentira
-  - Objetivo:  ${aiDiagnosis?.fase5?.semana1?.objetivo}
-  - Reflexión: ${aiDiagnosis?.fase5?.semana1?.reflexion}
-  - Pregunta:  ${aiDiagnosis?.fase5?.semana1?.autoconfrontacion}
-  - Registro:  ${aiDiagnosis?.fase5?.semana1?.registroPensamientos}
-  - Oración:   ${aiDiagnosis?.fase5?.semana1?.oracionGuiada}
-
-• SEMANA 2: Desmantelamiento Cognitivo
-  - Objetivo:  ${aiDiagnosis?.fase5?.semana2?.objetivo}
-  - Evidencia: ${aiDiagnosis?.fase5?.semana2?.evidenciaContraria}
-  - Reencuadre: ${aiDiagnosis?.fase5?.semana2?.reencuadreBiblico}
-  - Desafío:   ${aiDiagnosis?.fase5?.semana2?.desafiosPracticos}
-  - Anclaje:   ${aiDiagnosis?.fase5?.semana2?.interrupcionPatrones}
-
-• SEMANA 3: Renovación y Cableado Nuevo
-  - Objetivo:  ${aiDiagnosis?.fase5?.semana3?.objetivo}
-  - Meditación: ${aiDiagnosis?.fase5?.semana3?.meditacionDiaria}
-  - Memoria:   ${aiDiagnosis?.fase5?.semana3?.memorizacionVersiculo}
-  - Gratitud:  ${aiDiagnosis?.fase5?.semana3?.diarioGratitud}
-  - Ensayo:    ${aiDiagnosis?.fase5?.semana3?.visualizacionBiblica}
-
-• SEMANA 4: Consolidación y Obediencia de Fe
-  - Objetivo:  ${aiDiagnosis?.fase5?.semana4?.objetivo}
-  - Provocación: ${aiDiagnosis?.fase5?.semana4?.retosReales}
-  - He de Fe:   ${aiDiagnosis?.fase5?.semana4?.accionesFe}
-  - Límites:   ${aiDiagnosis?.fase5?.semana4?.conversacionesDificiles}
-  - Obediencia: ${aiDiagnosis?.fase5?.semana4?.pasosObediencia}
-
-================================================================================
-FASE 6: ITINERARIO DEVOCIONAL COMPLETO DE 30 DÍAS
-================================================================================
-${aiDiagnosis?.fase6?.map(day => `
-DÍA ${day.dia}: ${day.enfoque.toUpperCase()}
---------------------------------------------------------------------------------
-📖 Pasaje del día: "${day.versiculo.texto}" (${day.versiculo.referencia})
-🌱 Micro-Acción Práctica: ${day.accion}
-🧠 Autoconfrontación Interna: ${day.reflexion}
-🙏 Oración sugerida (Voz audible): "${day.oracion}"
-`).join('\n\n')}
-
-================================================================================
-FASE 8: CLAUSURA Y ACUERDO DE FILIACIÓN DE FE
-================================================================================
-• Estado Inicial: ${aiDiagnosis?.reporteFinal?.antes}
-• Estado Libre: ${aiDiagnosis?.reporteFinal?.ahora}
-• Sentencia de la Limitación:  ${aiDiagnosis?.reporteFinal?.creenciaDerribada}
-• Sentencia de la Verdad:      ${aiDiagnosis?.reporteFinal?.verdadEstablecida}
-• Próximo Hábito Duradero:     ${aiDiagnosis?.reporteFinal?.proximoPaso}
-
-✨ BENDICIÓN DE COMPROMISO PASTORAL DE CLAUSURA:
-   "${aiDiagnosis?.reporteFinal?.exhortacionBiblica || 'Por lo tanto, mantén firmemente la mirada fija en Jesús...'}"
-
-================================================================================
-HISTORIAL DE VALORACIONES DE TU DIARIO DE ORACIÓN:
-================================================================================
-${results.map(r => `
-* Creencia Evaluada: "${r.creencia}" (${r.alias})
-  - Diario personal escrito por ti:
-    "${journalNotes[r.id] || '(No guardaste notas de oración correspondientes en este casillero).'}"
-`).join('\n')}
-
---------------------------------------------------------------------------------
-Desarrollado con amor y rigor pastoral por Josue Cortes • Transformación Interior
-Canal Oficial de WhatsApp: wa.me/5491122334455
-Página Web: levantateresplandece1136.com
---------------------------------------------------------------------------------
-`;
-
-    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `Manual-Transformacion-Interior-${userName.replace(/\s+/g, '_')}-${new Date().toISOString().split('T')[0]}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }
 }
