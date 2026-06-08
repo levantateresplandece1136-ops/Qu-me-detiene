@@ -25,8 +25,7 @@ import {
   Clock,
   Briefcase,
   Users,
-  Flame,
-  FileText
+  Flame
 } from 'lucide-react';
 import { creenciasDatabase, bloquesDiagnostico, CreenciaRecord } from './data/creencias';
 import { generateFallbackData, AIDiagnosis } from './utils/fallbackGenerator';
@@ -789,8 +788,8 @@ export default function App() {
   };
 
   // PDF Devotional exporter
-  const handleExportPDF = (mode: "resumida" | "extensa" = "extensa") => {
-    downloadPDFResults(userName, userEmail, aiDiagnosis, results, journalNotes, mode);
+  const handleExportPDF = () => {
+    downloadPDFResults(userName, userEmail, aiDiagnosis, results, journalNotes);
   };
 
   return (
@@ -2603,72 +2602,20 @@ export default function App() {
                       </div>
                     </div>
 
-                    {/* Elegante sección de descargas del plan unificado */}
-                    <div className="bg-[#121212] border-2 border-[#C9A84C]/25 rounded-[2rem] p-6 sm:p-8 space-y-6 relative overflow-hidden shadow-2xl mt-4">
-                      <div className="absolute top-0 right-0 w-32 h-32 bg-[#C9A84C]/5 rounded-full blur-3xl pointer-events-none" />
-                      
-                      <div className="text-center max-w-xl mx-auto space-y-2">
-                        <span className="text-[#C9A84C] font-mono text-[10px] uppercase tracking-[0.25em] font-semibold block">Romanos 12:2 • Entrega Unificada</span>
-                        <h3 className="text-xl font-bold font-display text-white">Manual y Bitácora de Transformación</h3>
-                        <p className="text-white/60 text-[11px] leading-relaxed">
-                          Descarga tu plan unificado de transformación (Fases 1 a 8) en formato PDF profesional para registrar tus determinaciones eternas, la guía semanal y tu itinerario de combate de 30 días. Selecciona tu modalidad preferida:
-                        </p>
-                      </div>
+                    {/* Exporter and reset buttons */}
+                    <div className="flex flex-col sm:flex-row justify-center gap-4 pt-4">
+                      <button 
+                        onClick={handleExportPDF}
+                        className="bg-gradient-to-r from-[#C9A84C] to-yellow-600 text-[#0D0D0D] font-bold px-10 py-4 rounded-xl text-base shadow-xl hover:-translate-y-0.5 transition-all flex items-center justify-center gap-3 w-full sm:w-auto cursor-pointer"
+                      >
+                        <Download className="w-5 h-5" /> Descargar mi Guía de 30 Días (PDF)
+                      </button>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* OPCIÓN 1: RESUMIDA & HOJAS DE TRABAJO */}
-                        <div className="bg-[#181818]/60 border border-white/5 rounded-2xl p-5 hover:border-[#C9A84C]/20 transition-all flex flex-col justify-between">
-                          <div className="space-y-2">
-                            <div className="flex justify-between items-start">
-                              <span className="bg-[#C9A84C]/10 text-[#C9A84C] font-mono text-[9px] uppercase tracking-wider font-extrabold px-2.5 py-1 rounded-full">
-                                Modalidad Práctica (Ficha)
-                              </span>
-                              <FileText className="w-4 h-4 text-[#C9A84C]/60" />
-                            </div>
-                            <h4 className="text-white font-bold text-sm font-display">Fichas & Hojas de Trabajo</h4>
-                            <p className="text-white/50 text-[11px] leading-relaxed">
-                              Ideal para imprimir y rellenar/escribir a mano. Formateado con checklists resumidos para tus exámenes, de autoconfrontación, cuadros de reflexión semanal con renglones para notas y un calendario sintetizado para controlar tus hábitos.
-                            </p>
-                          </div>
-                          <button 
-                            onClick={() => handleExportPDF("resumida")}
-                            className="mt-4 w-full bg-[#C9A84C]/10 hover:bg-[#C9A84C] text-[#C9A84C] hover:text-black font-semibold py-2.5 px-4 rounded-xl text-xs flex items-center justify-center gap-2 border border-[#C9A84C]/20 hover:border-transparent transition-all active:scale-95 cursor-pointer"
-                          >
-                            <Download className="w-3.5 h-3.5" /> Descargar Cuaderno Práctico
-                          </button>
-                        </div>
-
-                        {/* OPCIÓN 2: EXTENSA CON EXPLICACIÓN */}
-                        <div className="bg-[#181818]/60 border border-white/5 rounded-2xl p-5 hover:border-[#C9A84C]/30 transition-all flex flex-col justify-between">
-                          <div className="space-y-2">
-                            <div className="flex justify-between items-start">
-                              <span className="bg-indigo-500/10 text-indigo-400 font-mono text-[9px] uppercase tracking-wider font-extrabold px-2.5 py-1 rounded-full">
-                                Modalidad Exhaustiva
-                              </span>
-                              <BookOpen className="w-4 h-4 text-indigo-400/60" />
-                            </div>
-                            <h4 className="text-white font-bold text-sm font-display">Manual Completo Detallado</h4>
-                            <p className="text-white/50 text-[11px] leading-relaxed">
-                              Libro de cabecera detallado. Incluye las bases completas del método, la explicación científica de la deshabituación mental, argumentos pastorales sobre tu nueva identidad y la guía diaria de 30 días completa.
-                            </p>
-                          </div>
-                          <button 
-                            onClick={() => handleExportPDF("extensa")}
-                            className="mt-4 w-full bg-gradient-to-r from-[#C9A84C] to-yellow-600 hover:brightness-110 text-black font-semibold py-2.5 px-4 rounded-xl text-xs flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer shadow-md shadow-[#C9A84C]/5"
-                          >
-                            <Download className="w-3.5 h-3.5" /> Descargar Manual Extenso
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Reset button outside and subtle */}
-                    <div className="flex justify-center pt-2">
                       <button 
                         onClick={restartJourney}
-                        className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-xs font-semibold bg-[#1C1C1C] hover:bg-[#262626] border border-white/5 text-white/55 hover:text-white transition-all cursor-pointer"
+                        className="flex items-center justify-center gap-2 px-8 py-4 rounded-xl font-bold bg-[#1C1C1C] hover:bg-[#262626] border border-white/5 text-white/70 hover:text-white transition-all w-full sm:w-auto cursor-pointer"
                       >
-                        <RefreshCcw className="w-3.5 h-3.5" /> Volver a realizar la Evaluación desde Cero
+                        <RefreshCcw className="w-4 h-4" /> Resetear Evaluación
                       </button>
                     </div>
                   </motion.div>
