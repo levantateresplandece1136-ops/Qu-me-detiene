@@ -596,3 +596,502 @@ export function getVisualInterventionMap(
     }
   ];
 }
+
+// ==========================================
+// PROMPT 13: PREGUNTA CENTRAL DE SESIÓN
+// ==========================================
+export interface CentralSessionQuestion {
+  id: string;
+  pregunta: string;
+  enfoquePastoral: string;
+  porqueEstaPregunta: string;
+  pasajeSoporte?: string;
+}
+
+export function selectCentralSessionQuestion(
+  screeningScores: Record<string, number>,
+  dominantBlockId: string
+): CentralSessionQuestion {
+  const control = screeningScores['control-entorno'] ?? 0;
+  const capacidad = screeningScores['capacidad-recursos'] ?? 0;
+  const social = screeningScores['aprobacion-social'] ?? 0;
+  const tiempo = screeningScores['tiempo-urgencia'] ?? 0;
+  const rendimiento = screeningScores['rendimiento-desempeno'] ?? 0;
+
+  // Cruce Control + Capacidad
+  if ((control >= 3 && capacidad >= 3) || (dominantBlockId === 'control-entorno' && capacidad >= 3)) {
+    return {
+      id: 'cq-ctrl-cap',
+      pregunta: '«Si no necesitaras demostrar que eres suficiente ante ti mismo/a o los demás, ¿cómo se vería ser fiel a Dios en las circunstancias exactas que estás viviendo hoy?»',
+      enfoquePastoral: 'Desconecta la obediencia a Dios de la necesidad carnal de validar la propia valía o suficiencia intelectual.',
+      porqueEstaPregunta: 'Se detecta un cruce entre alta necesidad de supervisión y temor a la insuficiencia de capacidades.',
+      pasajeSoporte: '2 Corintios 3:5'
+    };
+  }
+
+  // Control + Tiempo / Urgencia
+  if (control >= 4 && tiempo >= 4) {
+    return {
+      id: 'cq-ctrl-time',
+      pregunta: '«¿Qué crees íntimamente que ocurriría si soltaras aquello que no te corresponde controlar y aceptaras el ritmo finito que Dios te ha dado?»',
+      enfoquePastoral: 'Confronta la ilusión de omnipotencia sobre el reloj y los resultados futuros.',
+      porqueEstaPregunta: 'Ambos bloques alcanzan niveles máximos (5/5 o 4/5), sugiriendo sobre-preparación e hipervigilancia.',
+      pasajeSoporte: 'Salmo 127:2'
+    };
+  }
+
+  // Control solo
+  if (control >= 4 || dominantBlockId === 'control-entorno') {
+    return {
+      id: 'cq-ctrl',
+      pregunta: '«¿Qué crees que ocurriría si dejaras de controlar aquello que no te corresponde controlar?»',
+      enfoquePastoral: 'Lleva al aconsejado al punto de entrega y descanso en la providencia del Padre.',
+      porqueEstaPregunta: 'El control se manifiesta como el mecanismo principal de autodefensa.',
+      pasajeSoporte: '1 Pedro 5:7'
+    };
+  }
+
+  // Aprobación social
+  if (social >= 4 || dominantBlockId === 'aprobacion-social') {
+    return {
+      id: 'cq-social',
+      pregunta: '«¿Qué estás buscando recibir de las personas que sientes que necesitas indispensablemente para estar bien y en paz?»',
+      enfoquePastoral: 'Examina la idolatría de la validación humana frente al amor eterno del Padre.',
+      porqueEstaPregunta: 'El temor a la desaprobación condiciona las decisiones y el reposo interior.',
+      pasajeSoporte: 'Proverbios 29:25'
+    };
+  }
+
+  // Rendimiento
+  if (rendimiento >= 4 || dominantBlockId === 'rendimiento-desempeno') {
+    return {
+      id: 'cq-rendimiento',
+      pregunta: '«¿Qué ocurre con tu valor e identidad cuando no produces o alcanzas lo que esperabas de ti mismo/a?»',
+      enfoquePastoral: 'Separa la identidad en Cristo del currículo de éxitos y productividad humana.',
+      porqueEstaPregunta: 'El corazón ha vinculado su seguridad a las metas tangibles.',
+      pasajeSoporte: 'Lucas 10:20'
+    };
+  }
+
+  // Predeterminado pastoral
+  return {
+    id: 'cq-general',
+    pregunta: '«¿Qué verdad del amor y soberanía de Cristo te resulta más difícil abrazar en tu rutina diaria?»',
+    enfoquePastoral: 'Foco en la encarnación práctica del Evangelio en el corazón.',
+    porqueEstaPregunta: 'Alineación general del discipulado bíblico.',
+    pasajeSoporte: 'Romanos 8:32'
+  };
+}
+
+// ==========================================
+// PROMPT 14: PLAN DE CONSEJERÍA
+// ==========================================
+export interface PlanDeConsejeria {
+  comprensionDelCaso: string; // 5-8 líneas
+  hipotesisPrincipales: Array<{
+    titulo: string;
+    evidencia: string;
+    nivelConfianza: 'ALTA' | 'MODERADA' | 'BAJA' | 'INSUFICIENTE';
+    preguntasPorExplorar: string[];
+    explicacionesAlternativas?: string;
+  }>;
+  posiblesObjetivos: string[]; // 2-4 objetivos
+  direccionBiblica: IntelligentBiblicalDirection[]; // 2-4 textos pertinentes
+  movimientos: {
+    redefinir: string;
+    reenfocar: string;
+    rendir: string;
+    reestructurar: string;
+  };
+  tarea: Array<{
+    titulo: string;
+    descripcion: string;
+    tipo: 'VERDAD_FE_CONDUCTA' | 'LIMITE' | 'RENDICION';
+  }>; // 1-3 acciones concretas
+  indicadoresDeProgreso: string[];
+}
+
+export function generateCounselingPlan(
+  blockId: string,
+  screeningScores: Record<string, number>,
+  userName: string = 'Aconsejado'
+): PlanDeConsejeria {
+  const ctrl = screeningScores['control-entorno'] ?? 3;
+  const time = screeningScores['tiempo-urgencia'] ?? 3;
+  const four = getFourMovements(blockId);
+  const bib = getIntelligentBiblicalDirections(blockId);
+
+  return {
+    comprensionDelCaso: `${userName} presenta un patrón caracterizado por una alta necesidad de supervisión y gestión minuciosa del tiempo (Control ${ctrl}/5, Tiempo ${time}/5). Las respuestas no reflejan maldad deliberada, sino un intento persistente de resguardarse de la incertidumbre, el error o la sobrecarga. Aunque externamente puede parecer una persona muy organizada y dedicada, internamente experimenta tensión por anticipar escenarios adversos y le cuesta soltar el resultado en manos ajenas o de Dios. Es prioritario no apresurar un rótulo ni atribuir esto automáticamente a orgullo, sino investigar si existe un contexto real de sobrecarga objetiva, falta de herramientas de delegación o sufrimiento por exigencias desmedidas previas. La consejería debe conducirla desde la hipervigilancia solitaria hacia el reposo activo en la soberanía de Cristo.`,
+    hipotesisPrincipales: [
+      {
+        titulo: 'Hipervigilancia protectora ante la incertidumbre',
+        evidencia: `Puntuación máxima en Control (${ctrl}/5) y Tiempo (${time}/5) con autoexigencia de preparación anticipada.`,
+        nivelConfianza: 'MODERADA',
+        preguntasPorExplorar: [
+          '¿Qué teme concretamente que ocurra si no revisa o supervisa un proceso?',
+          '¿Qué significado íntimo tiene delegar una tarea y que no quede como ella lo haría?'
+        ],
+        explicacionesAlternativas: 'Podría tratarse de un entorno laboral o familiar desorganizado donde históricamente nadie asumía el deber.'
+      },
+      {
+        titulo: 'Finitud humana experimentada como insuficiencia personal',
+        evidencia: 'Tendencia a sentir que no saber o tardar en resolver amenaza la paz interior.',
+        nivelConfianza: 'BAJA',
+        preguntasPorExplorar: [
+          '¿Siente que debe tener todas las respuestas para ser respetada?',
+          '¿Cómo reacciona interiormente cuando otra persona sabe más que ella?'
+        ],
+        explicacionesAlternativas: 'Falta de capacitación técnica en gestión del tiempo más que un problema de vanagloria.'
+      },
+      {
+        titulo: 'Dificultad para descansar en la providencia activa de Dios',
+        evidencia: 'Cansancio acumulado y rumiación sobre el futuro inmediato.',
+        nivelConfianza: 'MODERADA',
+        preguntasPorExplorar: [
+          '¿Puede apagar los pendientes mentales durante su tiempo de devoción y sueño?',
+          '¿Qué cree acerca del cuidado de Dios cuando algo sale mal a pesar de haber orado?'
+        ],
+        explicacionesAlternativas: 'Fatiga física acumulada que magnifica la alarma del sistema nervioso.'
+      }
+    ],
+    posiblesObjetivos: [
+      'Aprender a distinguir entre fidelidad responsable y la pretensión de controlar los desenlaces futuros.',
+      'Identificar y renunciar al estándar de invulnerabilidad mediante el reposo en la suficiencia de Cristo.',
+      'Implementar prácticas concretas de delegación con instrucciones claras y límites sanos de jornada.'
+    ],
+    direccionBiblica: bib.slice(0, 3),
+    movimientos: {
+      redefinir: four.redefinir.interpretacionAExaminar,
+      reenfocar: four.reenfocar.verdadEvangelio,
+      rendir: four.rendir.queEntregarAlSenor,
+      reestructurar: four.reestructurar.nuevaRespuesta
+    },
+    tarea: [
+      {
+        titulo: 'La prueba de lo «Suficientemente Bueno»',
+        descripcion: 'Selecciona una actividad que normalmente retrasarías revisándola en exceso. Define un estándar razonable de fidelidad, entrégala en el plazo fijado y anota en tu cuaderno qué temías que ocurriera.',
+        tipo: 'VERDAD_FE_CONDUCTA'
+      },
+      {
+        titulo: 'Pausa de Rendición Matutina',
+        descripcion: 'Antes de iniciar las tareas del día, anota en una tarjeta 2 cosas que escapan a tu control y di en voz alta: «Señor, esto te pertenece a Ti; yo me ocuparé con fidelidad de lo que está en mis manos».',
+        tipo: 'RENDICION'
+      }
+    ],
+    indicadoresDeProgreso: [
+      'Capacidad para delegar una tarea pequeña sin enviar recordatorios de supervisión antes del plazo.',
+      'Disminución del tiempo dedicado a revisiones perfeccionistas de documentos o tareas.',
+      'Experiencia de descanso físico sin culpa al apagar los dispositivos en la noche.',
+      'Mayor serenidad al responder con un sencillo «no lo sé en este momento» cuando se desconoce un dato.'
+    ]
+  };
+}
+
+// ==========================================
+// PROMPT 15: TAREAS DE CAMBIO (VERDAD -> FE -> CONDUCTA)
+// ==========================================
+export interface BehavioralChangeTask {
+  patronDetectado: string;
+  verdadTeologica: string;
+  pasoDeFe: string;
+  conductaConcreta: string;
+  instruccionPrincipal: string;
+  preguntasDeSeguimiento: Array<{
+    pregunta: string;
+    propositoPastoral: string;
+  }>;
+}
+
+export function generateBehavioralChangeTask(blockId: string): BehavioralChangeTask {
+  return {
+    patronDetectado: 'Control + Preparación excesiva / Perfeccionismo',
+    verdadTeologica: 'Nuestra competencia proviene de Dios (2 Corintios 3:5). Dios no te pide perfección que garantice resultados, sino fidelidad gozosa en lo que te ha encomendado.',
+    pasoDeFe: 'Confiar en que Dios guardará el resultado aun cuando yo no revise la tarea 4 veces.',
+    conductaConcreta: 'Entregar la tarea en el tiempo estipulado habiendo hecho solo una revisión básica de calidad.',
+    instruccionPrincipal: 'Selecciona una tarea de esta semana que normalmente retrasarías intentando perfeccionarla o blindarla contra críticas. Define previamente qué significa «suficientemente bueno» y fiel. Entrégala en el tiempo fijado y registra tus respuestas a las preguntas de seguimiento.',
+    preguntasDeSeguimiento: [
+      {
+        pregunta: '¿Qué temía que ocurriera si la entregaba con imperfecciones?',
+        propositoPastoral: 'Identificar la amenaza percibida que activa la conducta defensiva.'
+      },
+      {
+        pregunta: '¿Qué resultado o reacción intentaba controlar con mis revisiones extras?',
+        propositoPastoral: 'Hacer visible el ídolo de seguridad o aprobación ajena.'
+      },
+      {
+        pregunta: '¿Qué conducta concreta realicé para obedecer en fe?',
+        propositoPastoral: 'Afianzar el paso de obediencia verificable.'
+      },
+      {
+        pregunta: '¿Qué ocurrió realmente tras entregarla? ¿Ocurrió la catástrofe anticipada?',
+        propositoPastoral: 'Contrastar la realidad con los escenarios ansiosos imaginados.'
+      },
+      {
+        pregunta: '¿Qué aprendí acerca de mis límites humanos y del cuidado providencial de Dios?',
+        propositoPastoral: 'Fijar el aprendizaje experiencial de la gracia.'
+      },
+      {
+        pregunta: '¿Qué verdad acerca del carácter de Dios y de la suficiencia de Cristo necesité recordar?',
+        propositoPastoral: 'Arraigar la conducta en la Persona de Cristo y Su Evangelio.'
+      }
+    ]
+  };
+}
+
+// ==========================================
+// PROMPT 16: SEGURIDAD CLÍNICA
+// ==========================================
+export interface ClinicalSafetyAlert {
+  hayAlertaRiesgo: boolean;
+  motivosDetectados: string[];
+  protocoloRecomendado: string;
+  lineasDeAyuda: Array<{ pais: string; telefono: string; servicio: string }>;
+}
+
+export const CLINICAL_SAFETY_NOTICE = {
+  advertenciaPrincipal: 'Esta herramienta no constituye diagnóstico clínico y no sustituye una evaluación médica, psiquiátrica o psicológica profesional.',
+  descripcion: 'El propósito de este mapa es brindar acompañamiento bíblico, pastoral y formativo para examinar los anhelos, interpretaciones y hábitos del corazón a la luz de la Palabra de Dios. No evalúa trastornos psiquiátricos ni provee terapia clínica.',
+  criteriosDeDerivacion: [
+    'Ideación suicida, pensamientos de muerte o planes de autolesión',
+    'Episodios de violencia física, doméstica o verbal descontrolada',
+    'Situaciones actuales o pasadas de abuso no contenidas',
+    'Crisis emocionales agudas o ataques de pánico invalidantes',
+    'Síntomas psicóticos, alucinaciones o pérdida de contacto con la realidad',
+    'Adicciones severas o dependencia de sustancias que ponen en riesgo la salud',
+    'Trastornos graves de la conducta alimentaria con impacto biomédico',
+    'Cualquier situación de riesgo inminente para la persona o terceros'
+  ],
+  lineasDeEmergencia: [
+    { pais: 'México', telefono: '800 911 2000', servicio: 'Línea de la Vida (24/7 gratuito)' },
+    { pais: 'Estados Unidos / Internacional', telefono: '988', servicio: 'Suicide & Crisis Lifeline (Español disponible)' },
+    { pais: 'Colombia', telefono: '106', servicio: 'Línea de Ayuda Psicológica y Salud Mental' },
+    { pais: 'Argentina', telefono: '135 / (011) 5275-1135', servicio: 'Centro de Asistencia al Suicida' },
+    { pais: 'España', telefono: '024 / 717 003 717', servicio: 'Línea de Atención a la Conducta Suicida / Teléfono de la Esperanza' }
+  ]
+};
+
+export function checkClinicalSafety(textToScan: string = ''): ClinicalSafetyAlert {
+  const lower = textToScan.toLowerCase();
+  const alertKeywords = [
+    { key: 'suicid', motivo: 'Ideación o mención de suicidio' },
+    { key: 'matarme', motivo: 'Pensamientos de muerte o autolesión' },
+    { key: 'quitarme la vida', motivo: 'Riesgo vital' },
+    { key: 'autolesi', motivo: 'Conductas de autodaño físico' },
+    { key: 'cortarme', motivo: 'Autolesión' },
+    { key: 'abuso sexual', motivo: 'Vulneración de integridad / abuso' },
+    { key: 'violencia física', motivo: 'Situación de violencia interpersonal' },
+    { key: 'alucinaci', motivo: 'Síntoma psicótico perceptivo' }
+  ];
+
+  const motivos: string[] = [];
+  for (const item of alertKeywords) {
+    if (lower.includes(item.key)) {
+      motivos.push(item.motivo);
+    }
+  }
+
+  return {
+    hayAlertaRiesgo: motivos.length > 0,
+    motivosDetectados: motivos,
+    protocoloRecomendado: motivos.length > 0 
+      ? 'Detener la consejería automatizada. Es indispensable activar la red de apoyo pastoral presencial y derivar inmediatamente a un centro de salud mental o urgencias médicas.'
+      : 'Uso formativo y pastoral ordinario.',
+    lineasDeAyuda: CLINICAL_SAFETY_NOTICE.lineasDeEmergencia
+  };
+}
+
+// ==========================================
+// PROMPT 20: PRINCIPIO FINAL DE LA APLICACIÓN (REGLA FUNDAMENTAL)
+// ==========================================
+export const PRINCIPIO_FUNDAMENTAL_SISTEMA = {
+  reglaFundamental: 'La herramienta no pretende decirle al consejero quién es la persona. Pretende ayudarle a hacer mejores preguntas para comprender cómo esa persona está interpretando sus circunstancias, qué está buscando, qué teme, cómo responde y dónde necesita ser redirigida hacia la verdad de Dios y la suficiencia de Cristo.',
+  metaDelSistema: {
+    loQueNoEs: 'La meta no es producir una etiqueta.',
+    loQueEs: 'La meta es producir un mapa de comprensión y una dirección de ayuda.'
+  },
+  transicionDePreguntas: {
+    etapa1: {
+      numero: 1,
+      deDondePartimos: '¿Qué diagnóstico tiene esta persona?',
+      etiqueta: 'Enfoque en etiquetas o rotulaciones estáticas (lo que dejamos atrás)',
+      descripcion: 'Intento de clasificar a la persona en un rótulo clínico o psicológico reduccionista.'
+    },
+    etapa2: {
+      numero: 2,
+      haciaDondeAvanzamos: '¿Qué está pasando en esta persona y cómo puedo ayudarla bíblicamente?',
+      etiqueta: 'Comprensión bíblica activa del corazón, circunstancias y verdad divina',
+      descripcion: 'Mapeo de la interpretación subjetiva, deseos, temores y la necesidad de redención en Cristo.'
+    },
+    etapa3: {
+      numero: 3,
+      metaFinal: '¿Cómo puede esta persona aprender a responder con fe y fidelidad a Dios en sus circunstancias concretas?',
+      etiqueta: 'Fruto pastoral, dependencia de la gracia y obediencia cotidiana',
+      descripcion: 'Crecimiento práctico fundamentado en la suficiencia de Cristo para honrar a Dios en lo cotidiano.'
+    }
+  }
+};
+
+// ==========================================
+// PROMPT 17: MAPA DE EXPLORACIÓN DEL CORAZÓN (ESTRUCTURA DE 10 PASOS)
+// ==========================================
+export interface HeartExplorationMapResult {
+  titulo: 'MAPA DE EXPLORACIÓN DEL CORAZÓN';
+  principioFundamental: typeof PRINCIPIO_FUNDAMENTAL_SISTEMA;
+  loQueObservamos: {
+    datosObjetivos: Array<{ bloque: string; puntaje: number; descripcion: string }>;
+    sintesisRespuestas: string;
+  };
+  patronesDetectados: {
+    relacionesEntreBloques: string[];
+    dinamicaDominante: string;
+  };
+  hipotesisPrincipales: Array<{
+    numero: number;
+    hipotesis: string;
+    evidencia: string;
+    explicacionAlternativa: string;
+  }>;
+  nivelDeConfianza: {
+    nivel: 'ALTA' | 'MODERADA' | 'BAJA' | 'INSUFICIENTE';
+    justificacion: string;
+    reglaInquebrantable: 'Nunca mostrar una hipótesis como certeza cuando la evidencia sea insuficiente.';
+  };
+  cicloPosible: VisualInterventionNode[];
+  loQueTodaviaNecesitamosInvestigar: LoQueTodaviaNoSabemosItem[];
+  preguntaCentral: CentralSessionQuestion;
+  direccionBiblica: FourMovementsData;
+  textosBiblicosSugeridos: IntelligentBiblicalDirection[];
+  proximoPaso: BehavioralChangeTask;
+}
+
+export function buildHeartExplorationMap(
+  screeningScores: Record<string, number>,
+  userName: string = 'Aconsejado'
+): HeartExplorationMapResult {
+  // Encontrar bloque dominante
+  const entries = Object.entries(screeningScores);
+  entries.sort((a, b) => b[1] - a[1]);
+  const dominantBlock = entries[0]?.[0] || 'control-entorno';
+
+  const four = getFourMovements(dominantBlock);
+  const bib = getIntelligentBiblicalDirections(dominantBlock);
+  const cycle = getVisualInterventionMap(dominantBlock, userName);
+  const centralQ = selectCentralSessionQuestion(screeningScores, dominantBlock);
+  const homework = generateBehavioralChangeTask(dominantBlock);
+  const unknowns = getLoQueTodaviaNoSabemos(dominantBlock, screeningScores);
+
+  // Formatear datos objetivos
+  const blockNames: Record<string, string> = {
+    'control-entorno': 'Control y Entorno',
+    'tiempo-urgencia': 'Tiempo y Urgencia',
+    'capacidad-recursos': 'Capacidad y Recursos',
+    'identidad-autoestima': 'Identidad y Valor',
+    'aprobacion-social': 'Aceptación Social',
+    'espiritualidad-fe': 'Espiritualidad y Fe',
+    'cuerpo-salud': 'Cuerpo y Salud',
+    'merecimiento-justicia': 'Merecimiento y Justicia',
+    'relaciones-confianza': 'Relaciones y Confianza',
+    'rendimiento-desempeno': 'Rendimiento y Desempeño'
+  };
+
+  const datosObj = Object.entries(screeningScores).map(([bId, sc]) => ({
+    bloque: blockNames[bId] || bId,
+    puntaje: sc,
+    descripcion: sc >= 4 ? 'Respuesta elevada (área de atención prioritaria)' : sc === 3 ? 'Respuesta media (tensión latente)' : 'Puntaje moderado o bajo'
+  }));
+
+  // Detectar relaciones
+  const relaciones: string[] = [];
+  const ctrlScore = screeningScores['control-entorno'] ?? 0;
+  const timeScore = screeningScores['tiempo-urgencia'] ?? 0;
+  const capScore = screeningScores['capacidad-recursos'] ?? 0;
+  const socScore = screeningScores['aprobacion-social'] ?? 0;
+
+  if (ctrlScore >= 4 && timeScore >= 4) {
+    relaciones.push('Cruce de alta tensión entre Control e Hiper-gestión del Tiempo: la urgencia temporal se utiliza como combustible para la supervisión constante.');
+  }
+  if (ctrlScore >= 4 && capScore >= 3) {
+    relaciones.push('Interacción entre Control y percepción de Capacidad: la necesidad de controlar puede ser un escudo defensivo para no exponer vacíos técnicos o límites creaturales.');
+  }
+  if (socScore >= 3) {
+    relaciones.push('Presencia de sensibilidad social: lo que otros opinen podría estar influyendo en el nivel de autoexigencia para evitar críticas.');
+  }
+
+  // Hipótesis con explicaciones alternativas
+  const hipotesis = [
+    {
+      numero: 1,
+      hipotesis: 'Supervisión defensiva frente a la incertidumbre del entorno',
+      evidencia: `Puntuaciones en Control (${ctrlScore}/5) y Tiempo (${timeScore}/5).`,
+      explicacionAlternativa: 'Podría deberse a una crisis laboral o familiar objetiva donde el entorno es genuinamente caótico y requiere orden temporal.'
+    },
+    {
+      numero: 2,
+      hipotesis: 'Falta de destrezas estructuradas de delegación y gestión',
+      evidencia: 'Dificultad reportada para soltar tareas o postergación por revisión minuciosa.',
+      explicacionAlternativa: 'No necesariamente es un problema espiritual de orgullo; puede ser un déficit de entrenamiento práctico en liderazgo de tareas.'
+    },
+    {
+      numero: 3,
+      hipotesis: 'Tensión entre la autoimagen de suficiencia y el reposo en la gracia',
+      evidencia: 'Capacidad (${capScore}/5) e Identidad (${screeningScores[\'identidad-autoestima\'] ?? 2}/5).',
+      explicacionAlternativa: 'Podría derivar de cansancio físico extremo o falta de descanso reparador en los últimos meses.'
+    }
+  ];
+
+  return {
+    titulo: 'MAPA DE EXPLORACIÓN DEL CORAZÓN',
+    principioFundamental: PRINCIPIO_FUNDAMENTAL_SISTEMA,
+    loQueObservamos: {
+      datosObjetivos: datosObj,
+      sintesisRespuestas: `Puntajes destacados en ${blockNames[dominantBlock] || dominantBlock} y áreas asociadas. No se asume que las respuestas representen una patología, sino un retrato honesto de cómo la persona experimenta sus presiones actuales.`
+    },
+    patronesDetectados: {
+      relacionesEntreBloques: relaciones,
+      dinamicaDominante: 'Patrón de anticipación y custodia del tiempo con posible sobrecosto energético en la desconexión mental.'
+    },
+    hipotesisPrincipales: hipotesis,
+    nivelDeConfianza: {
+      nivel: 'MODERADA',
+      justificacion: 'Existen correlaciones claras en los puntajes más altos, pero la muestra proviene de un cuestionario de autorreporte. Se requieren preguntas exploratorias y diálogo pastoral presencial para verificar las intenciones profundas del corazón.',
+      reglaInquebrantable: 'Nunca mostrar una hipótesis como certeza cuando la evidencia sea insuficiente.'
+    },
+    cicloPosible: cycle,
+    loQueTodaviaNecesitamosInvestigar: unknowns,
+    preguntaCentral: centralQ,
+    direccionBiblica: four,
+    textosBiblicosSugeridos: bib,
+    proximoPaso: homework
+  };
+}
+
+// ==========================================
+// PROMPT 19: CASO REAL SIMULADO (PRESET DE PRUEBA RIGUROSO)
+// ==========================================
+export const SIMULATED_CASE_19 = {
+  nombre: 'Caso de Prueba Simulado (Prompt 19)',
+  puntajes: {
+    'control-entorno': 5,
+    'tiempo-urgencia': 5,
+    'capacidad-recursos': 3,
+    'identidad-autoestima': 3,
+    'aprobacion-social': 3,
+    'espiritualidad-fe': 3,
+    'cuerpo-salud': 3,
+    'merecimiento-justicia': 2,
+    'relaciones-confianza': 2,
+    'rendimiento-desempeno': 2
+  },
+  interpretacionInicialUsuario: 'La persona teme ser descubierta como insuficiente, se prepara demasiado, le cuesta delegar y posterga decisiones porque necesita sentir que todo está bajo control.',
+  analisisCriticoCalidad: {
+    evitaSindromeImpostor: true,
+    justificacionAntietiquetas: 'El sistema NO diagnostica "Síndrome del Impostor" ni ninguna otra etiqueta clínica o psicológica secular. Reconoce objetivamente un puntaje de Control=5 y Tiempo=5 con Capacidad=3, pero plantea con honestidad que la persona podría simplemente estar sobrecargada objetivamente o carecer de metodologías de delegación.',
+    explicacionesAlternativasObligatorias: [
+      'Sobrecarga situacional real: proyectos complejos con plazos estrictos que justifican alta atención.',
+      'Déficit de habilidades: nunca se le ha enseñado cómo formular mandatos de delegación con indicadores claros.',
+      'Sufrimiento previo: malas experiencias con colaboradores negligentes que la dejaron desamparada en el pasado.'
+    ]
+  }
+};
+

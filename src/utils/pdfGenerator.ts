@@ -86,16 +86,32 @@ export const downloadPDFResults = (
     y += 6;
     doc.text(`Fecha de Diagnóstico: ${new Date().toLocaleDateString('es-ES')}`, margin + 10, y);
     y += 6;
-    doc.text(`Metodología: Neurobiología y Consejería Bíblica Unificada (Levántate Resplandece)`, margin + 10, y, { maxWidth: maxWidth - 20 });
+    doc.text(`Metodología: Consejería Bíblica y Pastoral Cristocéntrica (Levántate Resplandece)`, margin + 10, y, { maxWidth: maxWidth - 20 });
 
-    y += 20;
+    y += 15;
+    // Advertencia de seguridad clínica en portada
+    doc.setFillColor(254, 243, 199);
+    doc.setDrawColor(217, 119, 6);
+    doc.setLineWidth(0.4);
+    doc.rect(margin + 5, y, maxWidth - 10, 22, "FD");
+    doc.setFont("Helvetica", "bold");
+    doc.setFontSize(7.5);
+    doc.setTextColor(180, 83, 9);
+    doc.text("AVISO ÉTICO Y SEGURIDAD CLÍNICA:", margin + 8, y + 5);
+    doc.setFont("Helvetica", "normal");
+    doc.setFontSize(7);
+    doc.setTextColor(60, 60, 60);
+    const disclaimer = "Esta herramienta formativa no constituye diagnóstico clínico y no sustituye evaluación psicológica o psiquiátrica profesional. Ante ideación suicida, autolesiones, violencia o crisis agudas, derive de inmediato a servicios médicos o líneas de emergencia especializadas.";
+    doc.text(doc.splitTextToSize(disclaimer, maxWidth - 16), margin + 8, y + 10);
+
+    y += 28;
     doc.setFont("Helvetica", "normal");
     doc.setFontSize(9);
     doc.setTextColor(100, 100, 100);
-    const introText = "Este manual representa las 8 fases completas del proceso de reestructuración mental y renovación espiritual. Contiene el diagnóstico de rumiaciones y mentiras carnales desmanteladas, las determinaciones ancladas en la Verdad Divina y la guía devocional de 30 días para forjar nuevas autopistas sinápticas de fe, paz y obediencia.";
+    const introText = "Este documento representa el Mapa de Exploración del Corazón y el itinerario de acompañamiento pastoral. Contiene datos observables, hipótesis no deterministas para explorar, la pregunta central de sesión, la dirección bíblica en 4 movimientos y las prácticas de fidelidad.";
     doc.text(introText, margin + 10, y, { maxWidth: maxWidth - 20 });
 
-    y += 35;
+    y += 30;
     doc.setDrawColor(201, 168, 76);
     doc.setFillColor(201, 168, 76);
     doc.rect(margin + 10, y, 60, 0.5, "F");
@@ -169,6 +185,13 @@ export const downloadPDFResults = (
   };
 
   // SECTION 1
+  writeHeading("PRINCIPIO FUNDAMENTAL DEL SISTEMA (PROMPT 20)");
+  writeTextBlock(
+    "REGLA PASTORAL DE ORO • MAPA DE COMPRENSIÓN, NO ETIQUETA",
+    "«La herramienta no pretende decirle al consejero quién es la persona. Pretende ayudarle a hacer mejores preguntas para comprender cómo esa persona está interpretando sus circunstancias, qué está buscando, qué teme, cómo responde y dónde necesita ser redirigida hacia la verdad de Dios y la suficiencia de Cristo.»\n\n• Meta del sistema: La meta no es producir una etiqueta; es producir un mapa de comprensión y una dirección de ayuda.\n• Dejar atrás: «¿Qué diagnóstico tiene esta persona?» (etiquetas estáticas).\n• Comprensión bíblica: «¿Qué está pasando en esta persona y cómo puedo ayudarla bíblicamente?»\n• Fidelidad en Cristo: «¿Cómo puede esta persona aprender a responder con fe y fidelidad a Dios en sus circunstancias concretas?»",
+    false
+  );
+
   writeHeading("FASE 1 Y 2: MAPA DE EXPLORACIÓN Y DISCERNIMIENTO PASTORAL");
   
   if (aiDiagnosis?.exploratorio) {
@@ -347,6 +370,65 @@ export const downloadPDFResults = (
     aiDiagnosis?.fase4?.declaracionIdentidad || (results && results[0]?.declaracion),
     false
   );
+
+  // CONSEJERÍA INTEGRAL: PREGUNTA CENTRAL, 4 MOVIMIENTOS Y TAREA DE CAMBIO
+  if (aiDiagnosis?.heartExplorationMap || aiDiagnosis?.centralSessionQuestion) {
+    const map = aiDiagnosis.heartExplorationMap;
+    const centralQ = aiDiagnosis.centralSessionQuestion || map?.preguntaCentral;
+    const four = aiDiagnosis.counselingPlan?.movimientos || map?.direccionBiblica;
+
+    writeHeading("MAPA DE CONSEJERÍA PASTORAL Y PREGUNTA CENTRAL DE SESIÓN");
+
+    if (centralQ) {
+      checkNewPage(30);
+      doc.setFillColor(254, 252, 240);
+      doc.setDrawColor(201, 168, 76);
+      doc.rect(margin, y, maxWidth, 22, "FD");
+      doc.setFont("Helvetica", "bold");
+      doc.setFontSize(8.5);
+      doc.setTextColor(180, 130, 20);
+      doc.text("PREGUNTA CENTRAL DE SESIÓN (PROMPT 13):", margin + 4, y + 5);
+      doc.setFont("Helvetica", "italic");
+      doc.setFontSize(9);
+      doc.setTextColor(30, 30, 30);
+      const splitCQ = doc.splitTextToSize(`"${centralQ.pregunta}"`, maxWidth - 8);
+      doc.text(splitCQ, margin + 4, y + 10);
+      doc.setFont("Helvetica", "normal");
+      doc.setFontSize(7.5);
+      doc.setTextColor(100, 100, 100);
+      doc.text(`Enfoque pastoral: ${centralQ.enfoquePastoral || ''}`, margin + 4, y + 19);
+      y += 26;
+    }
+
+    if (four) {
+      writeKeyValue("1. REDEFINIR (Examinar)", four.redefinir || four.redefinir?.interpretacionAExaminar || "Examinar la falsa creencia de autosuficiencia.");
+      writeKeyValue("2. REENFOCAR (Hacia Cristo)", four.reenfocar || four.reenfocar?.verdadEvangelio || "Fijar los ojos en la gracia providencial del Padre.");
+      writeKeyValue("3. RENDIR (Entregar Control)", four.rendir || four.rendir?.queEntregarAlSenor || "Someter la necesidad de predecir o blindarse ante fallos.");
+      writeKeyValue("4. REESTRUCTURAR (Nueva Práctica)", four.reestructurar || four.reestructurar?.nuevaRespuesta || "Dar pasos medidos de delegación y reposo sabático.");
+    }
+
+    if (map?.loQueTodaviaNecesitamosInvestigar && map.loQueTodaviaNecesitamosInvestigar.length > 0) {
+      checkNewPage(35);
+      doc.setFont("Helvetica", "bold");
+      doc.setFontSize(9);
+      doc.setTextColor(160, 100, 20);
+      doc.text("LO QUE TODAVÍA NO SABEMOS (EXPLORACIÓN PERSONAL OBLIGATORIA):", margin, y);
+      y += 5;
+      map.loQueTodaviaNecesitamosInvestigar.slice(0, 3).forEach((item: any) => {
+        writeKeyValue("Por explorar", `${item.enunciado} (Pregunta: «${item.preguntaParaLaSesion}»)`);
+      });
+    }
+
+    if (aiDiagnosis?.behavioralTask || map?.proximoPaso) {
+      const task = aiDiagnosis.behavioralTask || map?.proximoPaso;
+      checkNewPage(30);
+      writeTextBlock(
+        "🎯 TAREA DE CAMBIO CONDUCTUAL (VERDAD → FE → CONDUCTA)",
+        `${task.instruccionPrincipal}\n• Verdad: ${task.verdadTeologica}\n• Paso de Fe: ${task.pasoDeFe}\n• Conducta Concreta: ${task.conductaConcreta}`,
+        false
+      );
+    }
+  }
 
   // SECTION 3
   writeHeading("FASE 5: HOJA DE RUTA SEMANAL DE RESTRUCTURACIÓN");

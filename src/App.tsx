@@ -41,6 +41,8 @@ import { blockDefinitions, detectBlockInteractions, DetectedInteraction, BlockDe
 import { generateFallbackData, AIDiagnosis } from './utils/fallbackGenerator';
 import { downloadPDFResults } from './utils/pdfGenerator';
 import GoldenCelebration from './components/GoldenCelebration';
+import { HeartExplorationSection } from './components/HeartExplorationSection';
+import { SIMULATED_CASE_19 } from './data/counselingMovements';
 
 export interface UserResult extends CreenciaRecord {
   category: string;
@@ -283,6 +285,61 @@ export default function App() {
   });
   const [showCelebrationModal, setShowCelebrationModal] = useState(false);
   const [barWidth, setBarWidth] = useState('0%');
+  const [isSimulatedCase19, setIsSimulatedCase19] = useState(() => {
+    return localStorage.getItem('ti_is_simulated_case_19') === 'true';
+  });
+
+  const handleLoadSimulatedCase19 = () => {
+    const caseAnswers = SIMULATED_CASE_19.puntajes;
+    setScreeningAnswers(caseAnswers);
+    localStorage.setItem('ti_screening_answers', JSON.stringify(caseAnswers));
+
+    const sorted = Object.entries(caseAnswers).sort((a, b) => b[1] - a[1]);
+    const highBlocks = sorted.filter(([_, score]) => score >= 3).map(([id]) => id);
+    setActiveBlocks(highBlocks);
+    localStorage.setItem('ti_active_blocks', JSON.stringify(highBlocks));
+
+    const fakePrimary: UserResult = {
+      id: 9919,
+      bloque: 'Control & Entorno',
+      bloqueId: 'control-entorno',
+      category: 'Control & Entorno',
+      alias: 'Control y Vigilancia',
+      creencia: 'Necesidad de control como estrategia de protección',
+      afirmacionTest: 'Siento que si no tengo todo bajo control y no reviso cada detalle, algo saldrá mal y quedaré como insuficiente.',
+      verdad: 'Nuestra competencia proviene de Dios (2 Corintios 3:5). Dios sustenta todas las cosas en Su soberana providencia.',
+      declaracion: 'Descanso en la providencia de Dios; soy libre de la tiranía de la perfección porque Cristo es mi suficiencia y amparo.',
+      impacto: 'Dificultad recurrente para delegar tareas, postergación por preparación excesiva y temor latente a la crítica o al error.',
+      neuro: 'Hiperactivación prefrontal y del eje del estrés.',
+      lenguaje: ['Tengo que asegurarme', 'Nadie lo hará bien'],
+      conducta: ['Revisión compulsiva', 'Dificultad para delegar'],
+      espiritu: 'Temor a la vulnerabilidad y a descansar en la soberanía de Dios.',
+      versiculos: [
+        { txt: 'No que seamos competentes por nosotros mismos para pensar algo como de nosotros mismos, sino que nuestra competencia proviene de Dios.', ref: '2 Corintios 3:5' },
+        { txt: 'Por nada estéis afanosos, sino sean conocidas vuestras peticiones delante de Dios en toda oración y ruego, con acción de gracias.', ref: 'Filipenses 4:6' }
+      ],
+      intensity: 5,
+      scoreMax: 5
+    };
+
+    const simulatedDiag = generateFallbackData(
+      fakePrimary,
+      userName || 'Caso de Estudio Simulado',
+      userEmail || 'simulacion@ejemplo.com',
+      [fakePrimary]
+    );
+
+    setResults([fakePrimary]);
+    localStorage.setItem('ti_results', JSON.stringify([fakePrimary]));
+    setAiDiagnosis(simulatedDiag);
+    localStorage.setItem('ti_ai_diagnosis', JSON.stringify(simulatedDiag));
+    setIsUnveiled(true);
+    localStorage.setItem('ti_is_unveiled', 'true');
+    setIsSimulatedCase19(true);
+    localStorage.setItem('ti_is_simulated_case_19', 'true');
+    setActiveTab(0);
+    setStep('results');
+  };
 
   useEffect(() => {
     if (isAnswering) {
@@ -1098,10 +1155,28 @@ export default function App() {
                       </p>
                     </div>
 
-                    {/* Proverbios Quote Badge */}
+                    {/* Proverbios Quote Badge & Fundamental Principle */}
                     <div className="bg-[#1C1C1C]/40 border border-white/5 px-4 py-3 rounded-xl flex items-center gap-3 text-xs italic text-white/70 font-serif">
                       <span className="text-[#C9A84C] text-lg font-bold leading-none font-serif">“</span>
                       <span>Porque cual es su pensamiento en su corazón, tal es él. — Proverbios 23:7</span>
+                    </div>
+
+                    <div className="bg-[#121212] border border-[#C9A84C]/30 p-4 rounded-2xl flex items-start gap-3 text-xs text-white/80">
+                      <div className="p-2 rounded-xl bg-[#C9A84C]/15 border border-[#C9A84C]/30 text-[#C9A84C] flex-shrink-0 mt-0.5">
+                        <Compass className="w-4 h-4 text-[#C9A84C]" />
+                      </div>
+                      <div className="space-y-1">
+                        <span className="text-[10px] font-mono uppercase tracking-widest text-[#C9A84C] font-bold block">
+                          Principio Fundamental • Regla Pastoral de Oro (Prompt 20)
+                        </span>
+                        <p className="text-[11px] text-white/70 leading-relaxed font-sans italic">
+                          «La herramienta no pretende decirle al consejero quién es la persona. Pretende ayudarle a hacer mejores preguntas para comprender cómo esa persona está interpretando sus circunstancias, qué está buscando, qué teme, cómo responde y dónde necesita ser redirigida hacia la verdad de Dios y la suficiencia de Cristo.»
+                        </p>
+                        <div className="flex items-center gap-2 pt-1 text-[10px] font-mono text-[#C9A84C]">
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#C9A84C]" />
+                          <span>La meta no es producir una etiqueta; es producir un mapa de comprensión y una dirección de ayuda.</span>
+                        </div>
+                      </div>
                     </div>
 
                   </div>
@@ -1118,9 +1193,9 @@ export default function App() {
 
                       <div className="space-y-1.5">
                         <span className="text-[10px] tracking-[0.25em] font-mono text-[#C9A84C]/80 block uppercase font-bold">Puerta de Acceso</span>
-                        <h3 className="text-lg font-bold text-white tracking-tight">Prepara tu Perfil Personal</h3>
+                        <h3 className="text-lg font-bold text-white tracking-tight">Prepara tu Perfil de Exploración</h3>
                         <p className="text-xs text-white/50 leading-relaxed">
-                          Introduce tus datos confidenciales para mapear tus patrones neurológicos bajo la luz del diagnóstico.
+                          Introduce tus datos confidenciales para mapear tus interpretaciones, deseos y temores hacia la verdad de Dios y la suficiencia de Cristo.
                         </p>
                       </div>
 
@@ -1241,9 +1316,19 @@ export default function App() {
                         disabled={!acceptedTerms}
                         className="w-full relative group overflow-hidden bg-gradient-to-r from-[#C9A84C] to-yellow-600 disabled:from-gray-700 disabled:to-gray-800 disabled:text-white/40 disabled:pointer-events-none text-[#0D0D0D] font-bold py-4 px-6 rounded-xl hover:shadow-[0_0_25px_rgba(201,168,76,0.35)] hover:scale-[1.01] transition-all flex items-center justify-center gap-2 cursor-pointer"
                       >
-                        <span className="relative z-10 text-sm tracking-wide">Descubrir mi mapa mental oculto</span>
+                        <span className="relative z-10 text-sm tracking-wide">Descubrir mi mapa de exploración interior</span>
                         <ArrowRight className="w-4 h-4 relative z-10 transition-transform group-hover:translate-x-1" />
                         <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </button>
+
+                      {/* Botón de Simulación de Prueba Rápida (Prompt 19) */}
+                      <button
+                        type="button"
+                        onClick={handleLoadSimulatedCase19}
+                        className="w-full bg-[#181818] hover:bg-[#222222] border border-[#C9A84C]/40 text-[#C9A84C] font-mono text-xs font-bold py-3 px-4 rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer"
+                      >
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>PROBAR CASO REAL SIMULADO (Prompt 19: Control 5, Tiempo 5)</span>
                       </button>
 
                       {/* Supportive Info Badge List (Structured layout) */}
@@ -1254,7 +1339,7 @@ export default function App() {
                         </div>
                         <div className="flex items-center gap-2 text-white/70">
                           <Activity className="w-4 h-4 text-[#C9A84C] flex-shrink-0" />
-                          <span className="text-[11px] leading-tight font-medium">📊 Diagnóstico personal</span>
+                          <span className="text-[11px] leading-tight font-medium">📊 Mapa de comprensión</span>
                         </div>
                         <div className="flex items-center gap-2 text-white/70">
                           <Brain className="w-4 h-4 text-[#C9A84C] flex-shrink-0" />
@@ -2018,6 +2103,19 @@ export default function App() {
                       animate={{ opacity: 1 }}
                       className="space-y-8"
                     >
+                      {/* MAPA DE EXPLORACIÓN DEL CORAZÓN (PROMPTS 5-19) */}
+                      <HeartExplorationSection
+                        mapData={aiDiagnosis?.heartExplorationMap}
+                        counselingPlan={aiDiagnosis?.counselingPlan}
+                        discernment={aiDiagnosis?.pastoralDiscernment}
+                        fidelityCheck={aiDiagnosis?.fidelityCheck}
+                        centralQuestion={aiDiagnosis?.centralSessionQuestion}
+                        behavioralTask={aiDiagnosis?.behavioralTask}
+                        userName={userName || 'Aconsejado'}
+                        onLoadCase19={handleLoadSimulatedCase19}
+                        isSimulatedCase19={isSimulatedCase19}
+                      />
+
                       {/* BANNER METODOLÓGICO: FILOSOFÍA DE EXPLORACIÓN Y DISCERNIMIENTO */}
                       <div className="bg-gradient-to-r from-amber-950/25 via-[#161616] to-amber-950/15 border border-[#C9A84C]/30 p-5 sm:p-6 rounded-3xl relative overflow-hidden">
                         <div className="flex items-start gap-4">
@@ -2034,7 +2132,10 @@ export default function App() {
                               </span>
                             </div>
                             <p className="text-white/85 leading-relaxed">
-                              Esta herramienta no te etiqueta con juicios definitivos sobre tu corazón ni emite diagnósticos clínicos cerrados. Analiza los <strong>datos observables</strong> de tus respuestas, identifica <strong>patrones de conducta</strong> reportados, formula <strong>hipótesis</strong> para examinar delante de Dios y te acompaña a <strong>validar</strong> con sabiduría tu siguiente paso en gracia.
+                              <strong>Principio Fundamental (Prompt 20):</strong> «La herramienta no pretende decirle al consejero quién es la persona. Pretende ayudarle a hacer mejores preguntas para comprender cómo esa persona está interpretando sus circunstancias, qué está buscando, qué teme, cómo responde y dónde necesita ser redirigida hacia la verdad de Dios y la suficiencia de Cristo.»
+                            </p>
+                            <p className="text-[#C9A84C] font-mono text-[11px] pt-0.5">
+                              La meta no es producir una etiqueta. La meta es producir un mapa de comprensión y una dirección de ayuda.
                             </p>
                           </div>
                         </div>

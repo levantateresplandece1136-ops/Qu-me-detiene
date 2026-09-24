@@ -2,6 +2,22 @@ import { CreenciaRecord } from "../data/creencias";
 import { practicalStepsByBlock } from "../data/practicalSteps";
 import { detectBlockInteractions, DetectedInteraction } from "../data/blockDefinitions";
 import { ConfidenceLevel, ConfidenceEvaluation, evaluateHypothesisConfidence } from "./confidenceScorer";
+import {
+  HeartExplorationMapResult,
+  buildHeartExplorationMap,
+  PlanDeConsejeria,
+  generateCounselingPlan,
+  BehavioralChangeTask,
+  generateBehavioralChangeTask,
+  CentralSessionQuestion,
+  selectCentralSessionQuestion,
+  FidelityVsPerfectionCheck,
+  getFidelityVsPerfectionCheck
+} from "../data/counselingMovements";
+import {
+  DiscernmentAnalysis,
+  generatePastoralDiscernment
+} from "../data/pastoralDiscernment";
 
 export interface UserResult extends CreenciaRecord {
   category: string;
@@ -141,6 +157,12 @@ export interface AIDiagnosis {
   exploratorio?: ExploratoryDiagnosis;
   mapaDelCorazon?: HeartAnalysisMap;
   interacciones?: DetectedInteraction[];
+  heartExplorationMap?: HeartExplorationMapResult;
+  pastoralDiscernment?: DiscernmentAnalysis;
+  counselingPlan?: PlanDeConsejeria;
+  centralSessionQuestion?: CentralSessionQuestion;
+  behavioralTask?: BehavioralChangeTask;
+  fidelityCheck?: FidelityVsPerfectionCheck;
 }
 
 export function generateFallbackData(
@@ -995,11 +1017,23 @@ export function generateFallbackData(
     });
   }
   const detectedInteractions = detectBlockInteractions(scoresMap);
+  const heartExploration = buildHeartExplorationMap(scoresMap, name);
+  const pastoralDiscernment = generatePastoralDiscernment(blockId, observedScore);
+  const fidelityCheck = getFidelityVsPerfectionCheck(blockId, observedScore);
+  const counselingPlan = generateCounselingPlan(blockId, scoresMap, name);
+  const centralSessionQuestion = selectCentralSessionQuestion(scoresMap, blockId);
+  const behavioralTask = generateBehavioralChangeTask(blockId);
 
   const result: AIDiagnosis = {
     exploratorio: exploratorioData,
     mapaDelCorazon: mapaDelCorazon,
     interacciones: detectedInteractions,
+    heartExplorationMap: heartExploration,
+    pastoralDiscernment: pastoralDiscernment,
+    fidelityCheck: fidelityCheck,
+    counselingPlan: counselingPlan,
+    centralSessionQuestion: centralSessionQuestion,
+    behavioralTask: behavioralTask,
     fase1: {
       principalBelief: practicalGuide
         ? `Patrón de ${practicalGuide.shortTitle}: ${practicalGuide.patron}`
