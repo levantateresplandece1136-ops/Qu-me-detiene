@@ -52,15 +52,15 @@ export interface ConfidenceInput {
  * Palabras clave para mapear hipótesis a bloques relacionados
  */
 const BLOCK_KEYWORD_MAP: Record<string, string[]> = {
-  'control-entorno': ['control', 'supervisión', 'incertidumbre', 'desborde', 'imprevisto', 'seguridad'],
-  'aprobacion-social': ['aprobación', 'rechazo', 'imagen', 'agradar', 'crítica', 'social', 'juicio', 'gente'],
-  'rendimiento-desempeno': ['rendimiento', 'desempeño', 'producción', 'éxito', 'fracaso', 'error', 'estándar', 'perfección'],
-  'capacidad-recursos': ['capacidad', 'insuficiente', 'incapaz', 'recursos', 'no poder', 'descalificado', 'competente'],
-  'identidad-valor': ['identidad', 'valor', 'dignidad', 'amor', 'sentirse menos', 'inadecuado'],
-  'tiempo-urgencia': ['tiempo', 'urgencia', 'tarde', 'prisa', 'retraso', 'postergación', 'agotamiento'],
-  'merecimiento-condicional': ['merecimiento', 'ganar', 'descanso', 'deuda', 'gracia', 'condición'],
-  'relaciones-confianza': ['confianza', 'vulnerabilidad', 'traición', 'apertura', 'distancia', 'soledad'],
-  'espiritualidad-trascendencia': ['espiritualidad', 'dios', 'castigo', 'culpa', 'oración', 'soberanía']
+  'control-entorno': ['control', 'supervisión', 'incertidumbre', 'desborde', 'imprevisto', 'seguridad', 'vigilancia'],
+  'genero-identidad-social': ['aprobación', 'rechazo', 'imagen', 'agradar', 'crítica', 'social', 'juicio', 'gente', 'pertenencia'],
+  'rendimiento-logro': ['rendimiento', 'desempeño', 'producción', 'éxito', 'fracaso', 'error', 'estándar', 'perfección'],
+  'capacidad-identidad': ['capacidad', 'insuficiente', 'incapaz', 'recursos', 'no poder', 'descalificado', 'competente'],
+  'merecimiento-vinculo': ['merecimiento', 'ganar', 'descanso', 'deuda', 'gracia', 'condición', 'identidad', 'valor', 'dignidad', 'amor', 'sentirse menos', 'inadecuado'],
+  'tiempo-futuro': ['tiempo', 'urgencia', 'tarde', 'prisa', 'retraso', 'postergación', 'agotamiento', 'futuro'],
+  'relaciones-poder': ['relaciones', 'confianza', 'vulnerabilidad', 'traición', 'apertura', 'distancia', 'soledad', 'conflicto', 'ceder', 'poder'],
+  'cuerpo-salud': ['cuerpo', 'salud', 'descanso', 'agotamiento', 'culpa al descansar', 'fatiga', 'físico', 'dormir', 'tensión'],
+  'espiritualidad-trascendencia': ['espiritualidad', 'dios', 'castigo', 'culpa', 'oración', 'soberanía', 'fe', 'propósito']
 };
 
 /**
@@ -138,17 +138,17 @@ export function evaluateHypothesisConfidence(input: ConfidenceInput): Confidence
     const mentionsControl = fullHypText.includes('control');
     const mentionsCapacidad = fullHypText.includes('incapaz') || fullHypText.includes('insuficiente');
 
-    const socialScore = screeningScores['aprobacion-social'] ?? 2;
-    const capacidadScore = screeningScores['capacidad-recursos'] ?? 2;
+    const socialScore = screeningScores['genero-identidad-social'] ?? screeningScores['aprobacion-social'] ?? 2;
+    const capacidadScore = screeningScores['capacidad-identidad'] ?? screeningScores['capacidad-recursos'] ?? 2;
 
-    if (mentionsSocial && socialScore <= 2 && bloqueId !== 'aprobacion-social') {
+    if (mentionsSocial && socialScore <= 2 && bloqueId !== 'genero-identidad-social' && bloqueId !== 'aprobacion-social') {
       factor2Score = 15;
       factor2Estado = 'insuficiente';
-      factor2Desc = `Aislamiento temático: Plantea temor a rechazo/aprobación, pero el bloque de Aprobación Social reportó nivel muy bajo (${socialScore}/5).`;
-    } else if (mentionsCapacidad && capacidadScore <= 2 && bloqueId !== 'capacidad-recursos') {
+      factor2Desc = `Aislamiento temático: Plantea temor a rechazo/aprobación, pero el bloque de Aceptación Social reportó nivel muy bajo (${socialScore}/5).`;
+    } else if (mentionsCapacidad && capacidadScore <= 2 && bloqueId !== 'capacidad-identidad' && bloqueId !== 'capacidad-recursos') {
       factor2Score = 20;
       factor2Estado = 'debil';
-      factor2Desc = `Sin convergencia cruzada: El bloque de Capacidad y Recursos reporta normalidad (${capacidadScore}/5).`;
+      factor2Desc = `Sin convergencia cruzada: El bloque de Capacidad e Identidad reporta normalidad (${capacidadScore}/5).`;
     } else {
       factor2Score = 40;
       factor2Estado = 'moderado';
@@ -202,7 +202,7 @@ export function evaluateHypothesisConfidence(input: ConfidenceInput): Confidence
 
   // Detectar contradicción clínica común: Hipótesis de alta ansiedad/rechazo pero puntajes bajísimos en identidad y aprobación
   const isHypothesisAboutRejection = fullHypText.includes('rechazo') || fullHypText.includes('aprobación');
-  const socialIsVeryLow = (screeningScores['aprobacion-social'] ?? 3) <= 1;
+  const socialIsVeryLow = (screeningScores['genero-identidad-social'] ?? screeningScores['aprobacion-social'] ?? 3) <= 1;
   const isHypothesisAboutControlDefensive = fullHypText.includes('control') && (screeningScores['control-entorno'] ?? 3) <= 1;
 
   if (isHypothesisAboutRejection && socialIsVeryLow) {

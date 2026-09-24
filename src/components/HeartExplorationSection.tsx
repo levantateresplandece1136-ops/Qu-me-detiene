@@ -353,12 +353,36 @@ export const HeartExplorationSection: React.FC<Props> = ({
               {map?.patronesDetectados.dinamicaDominante || 'Interacción funcional entre la necesidad de certidumbre y la administración de los recursos temporales.'}
             </p>
             <div className="space-y-2.5 pt-2 border-t border-white/5">
-              {map?.patronesDetectados.relacionesEntreBloques.map((rel, i) => (
-                <div key={i} className="p-3 rounded-2xl bg-indigo-950/20 border border-indigo-500/20 text-xs text-indigo-200/90 leading-relaxed flex items-start gap-2.5">
-                  <ArrowRight className="w-4 h-4 text-indigo-400 flex-shrink-0 mt-0.5" />
-                  <span>{rel}</span>
-                </div>
-              ))}
+              {(map?.patronesDetectados.relacionesEntreBloques || [])
+                .slice()
+                .sort((a, b) => {
+                  const aIsSenal = a.toLowerCase().includes('señal débil');
+                  const bIsSenal = b.toLowerCase().includes('señal débil');
+                  return (aIsSenal ? 1 : 0) - (bIsSenal ? 1 : 0);
+                })
+                .map((rel, i) => {
+                  const isSenal = rel.toLowerCase().includes('señal débil');
+                  return (
+                    <div
+                      key={i}
+                      className={`p-3 rounded-2xl border text-xs leading-relaxed flex items-start gap-2.5 ${
+                        isSenal
+                          ? 'bg-indigo-950/10 border-indigo-500/10 text-indigo-300/60 opacity-60'
+                          : 'bg-indigo-950/20 border-indigo-500/20 text-indigo-200/90'
+                      }`}
+                    >
+                      <ArrowRight className={`w-4 h-4 flex-shrink-0 mt-0.5 ${isSenal ? 'text-indigo-400/50' : 'text-indigo-400'}`} />
+                      <div>
+                        {isSenal && (
+                          <span className="inline-block px-2 py-0.5 rounded text-[10px] font-mono uppercase tracking-wider font-bold bg-amber-500/15 border border-amber-500/30 text-amber-300 mr-2 mb-1">
+                            Señal débil — a explorar
+                          </span>
+                        )}
+                        <span>{isSenal ? rel.replace(/^Señal débil — a explorar:\s*/i, '') : rel}</span>
+                      </div>
+                    </div>
+                  );
+                })}
             </div>
           </div>
         </div>

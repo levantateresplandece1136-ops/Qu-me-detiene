@@ -175,7 +175,7 @@ export const practicalStepsByBlock: Record<string, BlockPracticalGuide> = {
     dato: "Nivel elevado de autocrítica en el área de Capacidad e Identidad.",
     patron: "Tendencia observable a dudar de las propias competencias, sobreprepararse excesivamente o temer ser expuesto como no apto.",
     hipotesis: [
-      "Hipótesis A (Síndrome del impostor): Miedo a que otros descubran supuestas falencias personales, atribuyendo los logros a la suerte.",
+      "Hipótesis A (Temor a quedar expuesto/a): Miedo a que otros descubran supuestas falencias personales, atribuyendo los logros a la suerte.",
       "Hipótesis B (Herida de descalificación previa): Experiencias pasadas de juicio, rechazo o comparación que dejaron una huella de duda.",
       "Hipótesis C (Autoexigencia desmedida): Medir la propia valía contra un estándar inalcanzable de perfección sin margen para aprender."
     ],

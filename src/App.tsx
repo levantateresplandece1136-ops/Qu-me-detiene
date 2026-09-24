@@ -47,6 +47,8 @@ import { SIMULATED_CASE_19 } from './data/counselingMovements';
 export interface UserResult extends CreenciaRecord {
   category: string;
   intensity: number;
+  screeningScore?: number;
+  score?: number;
 }
 
 type Step = 'welcome' | 'screening' | 'calculating_blocks' | 'deep_dive' | 'generating_results' | 'results';
@@ -319,14 +321,16 @@ export default function App() {
         { txt: 'Por nada estéis afanosos, sino sean conocidas vuestras peticiones delante de Dios en toda oración y ruego, con acción de gracias.', ref: 'Filipenses 4:6' }
       ],
       intensity: 5,
-      scoreMax: 5
+      scoreMax: 5,
+      screeningScore: 5
     };
 
     const simulatedDiag = generateFallbackData(
       fakePrimary,
       userName || 'Caso de Estudio Simulado',
       userEmail || 'simulacion@ejemplo.com',
-      [fakePrimary]
+      [fakePrimary],
+      caseAnswers
     );
 
     setResults([fakePrimary]);
@@ -746,7 +750,8 @@ export default function App() {
           primaryBelief: primary,
           activeBeliefs: compiledResults.slice(0, 5),
           userAge,
-          userGoal
+          userGoal,
+          screeningAnswers
         })
       });
 
@@ -754,19 +759,19 @@ export default function App() {
         const data = await response.json();
         if (data.useFallback) {
           console.log("No GEMINI_API_KEY configured on server. Creating dynamic local fallback.");
-          const fallback = generateFallbackData(primary, userName, userEmail, compiledResults);
+          const fallback = generateFallbackData(primary, userName, userEmail, compiledResults, screeningAnswers);
           setAiDiagnosis(fallback);
         } else {
           setAiDiagnosis(data);
         }
       } else {
         console.warn("API Server responded with non-200. Proceeding with dynamic fallback.");
-        const fallback = generateFallbackData(primary, userName, userEmail, compiledResults);
+        const fallback = generateFallbackData(primary, userName, userEmail, compiledResults, screeningAnswers);
         setAiDiagnosis(fallback);
       }
     } catch (err) {
       console.error("Failed to query API for AI Diagnosis:", err);
-      const fallback = generateFallbackData(primary, userName, userEmail, compiledResults);
+      const fallback = generateFallbackData(primary, userName, userEmail, compiledResults, screeningAnswers);
       setAiDiagnosis(fallback);
     } finally {
       setLoadingAi(false);
@@ -1037,7 +1042,7 @@ export default function App() {
                     initial={{ width: 0 }}
                     animate={{ 
                       width: `${
-                        step === 'screening' ? ((screeningIndex + 1) / 18) * 100 :
+                        step === 'screening' ? ((screeningIndex + 1) / 9) * 100 :
                         step === 'calculating_blocks' ? 50 :
                         step === 'deep_dive' ? (50 + ((deepDiveIndex + 1) / deepDiveQuestions.length) * 50) :
                         step === 'generating_results' ? 95 : 100
@@ -2083,7 +2088,24 @@ export default function App() {
                 {/* TAB 0: 📊 Fase 1 y 2: Identificación y Diagnóstico del Sistema Cognitivo */}
                 {activeTab === 0 && (() => {
                   const primaryGuide = practicalStepsByBlock[primaryBlock.id] || practicalStepsByBlock['control-entorno'];
-                  const displayBelief = results[0]?.creencia || aiDiagnosis?.fase1?.principalBelief || "Búsqueda involuntaria de seguridad por esfuerzo propio";
+                  const displayBelief = results[0]?.afirmacionTest
+                    ? `Posible patrón a contrastar: «${results[0].afirmacionTest}»`
+                    : (aiDiagnosis?.fase1?.principalBelief || "Búsqueda involuntaria de seguridad por esfuerzo propio");
+
+                  const tiedHypotheses = (() => {
+                    if (!results || results.length < 2) return [];
+                    const score0 = (screeningAnswers[results[0].bloqueId] || 1) * 10 + (results[0].intensity || 1);
+                    const ties = [results[0]];
+                    for (let i = 1; i < results.length; i++) {
+                      const scoreI = (screeningAnswers[results[i].bloqueId] || 1) * 10 + (results[i].intensity || 1);
+                      if (scoreI === score0 && results[i].bloqueId !== results[0].bloqueId) {
+                        ties.push(results[i]);
+                        break;
+                      }
+                    }
+                    return ties.length > 1 ? ties : [];
+                  })();
+
                   const cleanWhatsapp = whatsappNumber.replace(/[^0-9]/g, '');
                   const isAllHealthy = dominantBlocks.length > 0 && dominantBlocks[0].score <= 2;
                   const expData = aiDiagnosis?.exploratorio;
@@ -2739,33 +2761,43 @@ export default function App() {
                         {/* Lista de interacciones detectadas */}
                         {detectedInteractions.length > 0 ? (
                           <div className="space-y-4">
-                            {detectedInteractions.map((inter, idx) => {
-                              const isValidated = validatedInteractions[inter.id];
-                              return (
-                                <div
-                                  key={inter.id || idx}
-                                  className={`p-5 rounded-2xl border transition-all space-y-4 ${
-                                    isValidated
-                                      ? 'bg-emerald-950/25 border-emerald-500/40 shadow-lg shadow-emerald-500/5'
-                                      : 'bg-black/35 border-white/10 hover:border-[#C9A84C]/40'
-                                  }`}
-                                >
-                                  {/* Interaction Badge Header */}
-                                  <div className="flex flex-wrap items-center justify-between gap-3">
-                                    <div className="flex flex-wrap items-center gap-2">
-                                      <span className="px-3 py-1 rounded-lg bg-[#C9A84C]/15 border border-[#C9A84C]/30 text-xs font-mono font-bold text-[#C9A84C]">
-                                        {inter.blockA.name} ({inter.blockA.score}/5)
-                                      </span>
-                                      <span className="text-white/40 text-xs font-mono font-bold">⚡</span>
-                                      <span className="px-3 py-1 rounded-lg bg-amber-500/15 border border-amber-500/30 text-xs font-mono font-bold text-amber-300">
-                                        {inter.blockB.name} ({inter.blockB.score}/5)
+                            {[...detectedInteractions]
+                              .sort((a, b) => (a.nivel === 'patron' ? 0 : 1) - (b.nivel === 'patron' ? 0 : 1))
+                              .map((inter, idx) => {
+                                const isValidated = validatedInteractions[inter.id];
+                                const isSignal = inter.nivel === 'senal';
+                                return (
+                                  <div
+                                    key={inter.id || idx}
+                                    className={`p-5 rounded-2xl border transition-all space-y-4 ${
+                                      isSignal ? 'opacity-70' : ''
+                                    } ${
+                                      isValidated
+                                        ? 'bg-emerald-950/25 border-emerald-500/40 shadow-lg shadow-emerald-500/5'
+                                        : 'bg-black/35 border-white/10 hover:border-[#C9A84C]/40'
+                                    }`}
+                                  >
+                                    {/* Interaction Badge Header */}
+                                    <div className="flex flex-wrap items-center justify-between gap-3">
+                                      <div className="flex flex-wrap items-center gap-2">
+                                        <span className="px-3 py-1 rounded-lg bg-[#C9A84C]/15 border border-[#C9A84C]/30 text-xs font-mono font-bold text-[#C9A84C]">
+                                          {inter.blockA.name} ({inter.blockA.score}/5)
+                                        </span>
+                                        <span className="text-white/40 text-xs font-mono font-bold">⚡</span>
+                                        <span className="px-3 py-1 rounded-lg bg-amber-500/15 border border-amber-500/30 text-xs font-mono font-bold text-amber-300">
+                                          {inter.blockB.name} ({inter.blockB.score}/5)
+                                        </span>
+                                        {isSignal && (
+                                          <span className="px-2.5 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-[10px] font-mono font-bold text-amber-300 uppercase tracking-wider">
+                                            Señal débil — a explorar
+                                          </span>
+                                        )}
+                                      </div>
+
+                                      <span className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[10px] font-mono uppercase tracking-wider text-white/70 font-semibold">
+                                        Eje: {inter.tag}
                                       </span>
                                     </div>
-
-                                    <span className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[10px] font-mono uppercase tracking-wider text-white/70 font-semibold">
-                                      Eje: {inter.tag}
-                                    </span>
-                                  </div>
 
                                   {/* Hipótesis de Interacción */}
                                   <div className="space-y-1 bg-black/40 border border-white/5 p-3.5 rounded-xl">

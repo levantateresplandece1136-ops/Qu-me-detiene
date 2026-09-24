@@ -169,7 +169,8 @@ export function generateFallbackData(
   primary: UserResult,
   userName: string,
   _userEmail: string,
-  activeBeliefs: UserResult[]
+  activeBeliefs: UserResult[],
+  screeningAnswers?: Record<string, number>
 ): AIDiagnosis {
   const blockId = primary.bloqueId || "capacidad-identidad";
   const name = userName?.trim() || "Hermano/a";
@@ -816,7 +817,9 @@ export function generateFallbackData(
     .filter((b) => b.id !== primary.id)
     .map((b) => `${b.alias} (${b.creencia})`);
 
-  const observedScore = (primary as any).screeningScore || (primary as any).score || 4;
+  const observedScore = screeningAnswers
+    ? (screeningAnswers[blockId] ?? (primary as any).screeningScore ?? (primary as any).score ?? 4)
+    : ((primary as any).screeningScore || (primary as any).score || 4);
 
   const exploratorioData: ExploratoryDiagnosis = practicalGuide
     ? {
@@ -1006,15 +1009,32 @@ export function generateFallbackData(
       };
 
   const scoresMap: Record<string, number> = {};
-  if (primary.bloqueId) {
-    scoresMap[primary.bloqueId] = observedScore;
-  }
-  if (Array.isArray(activeBeliefs)) {
-    activeBeliefs.forEach(b => {
-      if (b && b.bloqueId) {
-        scoresMap[b.bloqueId] = b.score || b.screeningScore || 3;
-      }
+  if (screeningAnswers) {
+    const all9Blocks = [
+      'capacidad-identidad',
+      'merecimiento-vinculo',
+      'control-entorno',
+      'rendimiento-logro',
+      'relaciones-poder',
+      'cuerpo-salud',
+      'espiritualidad-trascendencia',
+      'tiempo-futuro',
+      'genero-identidad-social'
+    ];
+    all9Blocks.forEach(bId => {
+      scoresMap[bId] = screeningAnswers[bId] ?? 1;
     });
+  } else {
+    if (primary.bloqueId) {
+      scoresMap[primary.bloqueId] = observedScore;
+    }
+    if (Array.isArray(activeBeliefs)) {
+      activeBeliefs.forEach(b => {
+        if (b && b.bloqueId) {
+          scoresMap[b.bloqueId] = b.score || b.screeningScore || 3;
+        }
+      });
+    }
   }
   const detectedInteractions = detectBlockInteractions(scoresMap);
   const heartExploration = buildHeartExplorationMap(scoresMap, name);

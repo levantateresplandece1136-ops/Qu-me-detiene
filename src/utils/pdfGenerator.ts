@@ -221,7 +221,8 @@ export const downloadPDFResults = (
 
     writeTextBlock("5. DIRECCIÓN DE AYUDA Y GRACIA", exp.direccionDeAyuda.enfoque, false);
   } else {
-    writeKeyValue("Patrón Principal", aiDiagnosis?.fase1?.principalBelief || (results && results[0]?.creencia));
+    const primaryPatternText = aiDiagnosis?.fase1?.principalBelief || (results && (results[0]?.afirmacionTest ? `Posible patrón a contrastar: «${results[0].afirmacionTest}»` : (results[0]?.alias || results[0]?.creencia)));
+    writeKeyValue("Patrón Principal", primaryPatternText);
     writeKeyValue("Hipótesis de Temor", aiDiagnosis?.fase1?.rootFear || 'Temor a la incertidumbre o al error.');
     writeKeyValue("Emoción Frecuente", aiDiagnosis?.fase1?.dominantEmotion || 'Inquietud o sobrecarga');
     writeKeyValue("Área Más Sensible", aiDiagnosis?.fase1?.affectedArea || 'Vida Diaria y Relaciones');
@@ -300,10 +301,11 @@ export const downloadPDFResults = (
       doc.setDrawColor(201, 168, 76);
       doc.roundedRect(margin, y, maxWidth, 24, 2, 2, "FD");
 
+      const signalPrefix = inter.nivel === 'senal' ? '(A explorar) ' : '';
       doc.setFont("Helvetica", "bold");
       doc.setFontSize(8.5);
       doc.setTextColor(40, 40, 40);
-      doc.text(`[${inter.blockA.name} ${inter.blockA.score}/5]  ↔  [${inter.blockB.name} ${inter.blockB.score}/5]  —  ${inter.tag}`, margin + 4, y + 5);
+      doc.text(`${signalPrefix}[${inter.blockA.name} ${inter.blockA.score}/5]  ↔  [${inter.blockB.name} ${inter.blockB.score}/5]  —  ${inter.tag}`, margin + 4, y + 5);
 
       doc.setFont("Helvetica", "normal");
       doc.setFontSize(8);
@@ -549,7 +551,8 @@ export const downloadPDFResults = (
   if (results && results.length > 0) {
     results.forEach((r: any) => {
       const note = journalNotes[r.id] || '(No guardaste notas de oración correspondientes en este casillero).';
-      const cellValue = `Materia: "${r.creencia}" (${r.alias})\nDiario de Oración personal: "${note}"`;
+      const materiaText = r.afirmacionTest || r.alias || r.creencia;
+      const cellValue = `Materia: "${materiaText}" (${r.alias || r.bloque})\nDiario de Oración personal: "${note}"`;
       const wrappedCell = doc.splitTextToSize(cellValue, maxWidth - 10);
       checkNewPage((wrappedCell.length * 4.5) + 6);
       

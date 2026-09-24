@@ -482,12 +482,15 @@ export interface DetectedInteraction {
   hipotesis: string;
   preguntaClave: string;
   direccionPastoral: string;
+  nivel: 'patron' | 'senal';
 }
 
 /**
  * Detecta dinámicamente interacciones relevantes entre bloques a partir de los puntajes
  * del usuario (Puntuaciones 1 a 5).
- * Siempre formula HIPÓTESIS de exploración pastoral, nunca diagnósticos deterministas.
+ * - Ambas áreas >= 4 → nivel 'patron'.
+ * - Una >= 4 y la otra = 3 → nivel 'senal'.
+ * - Si no → no se detecta.
  */
 export function detectBlockInteractions(scores: Record<string, number>): DetectedInteraction[] {
   const interactions: DetectedInteraction[] = [];
@@ -502,8 +505,15 @@ export function detectBlockInteractions(scores: Record<string, number>): Detecte
   const cuerpoScore = scores["cuerpo-salud"] || 0;
   const espiritualidadScore = scores["espiritualidad-trascendencia"] || 0;
 
+  const getInteractionLevel = (scoreA: number, scoreB: number): 'patron' | 'senal' | null => {
+    if (scoreA >= 4 && scoreB >= 4) return 'patron';
+    if ((scoreA >= 4 && scoreB === 3) || (scoreB >= 4 && scoreA === 3)) return 'senal';
+    return null;
+  };
+
   // Interacción 1: Control + Capacidad
-  if (controlScore >= 3 && capacidadScore >= 3) {
+  const lvl1 = getInteractionLevel(controlScore, capacidadScore);
+  if (lvl1) {
     interactions.push({
       id: "control-capacidad",
       blockA: { id: "control-entorno", name: "Control", score: controlScore },
@@ -511,12 +521,14 @@ export function detectBlockInteractions(scores: Record<string, number>): Detecte
       tag: "Compensación de Insuficiencia",
       hipotesis: "Hipótesis a discernir: ¿Podría ser que estás intentando controlar minuciosamente el entorno exterior para compensar o amortiguar una sensación interna de duda sobre tu propia suficiencia?",
       preguntaClave: "¿Sientes que tener todo estrictamente vigilado es tu única defensa para que otros no noten tus dudas de capacidad?",
-      direccionPastoral: "Descansar en que nuestra verdadera suficiencia proviene de Dios (2 Corintios 3:5), soltando la necesidad de demostrar competencia absoluta mediante el control."
+      direccionPastoral: "Descansar en que nuestra verdadera suficiencia proviene de Dios (2 Corintios 3:5), soltando la necesidad de demostrar competencia absoluta mediante el control.",
+      nivel: lvl1
     });
   }
 
   // Interacción 2: Control + Aceptación Social
-  if (controlScore >= 3 && socialScore >= 3) {
+  const lvl2 = getInteractionLevel(controlScore, socialScore);
+  if (lvl2) {
     interactions.push({
       id: "control-social",
       blockA: { id: "control-entorno", name: "Control", score: controlScore },
@@ -524,12 +536,14 @@ export function detectBlockInteractions(scores: Record<string, number>): Detecte
       tag: "Protección de Imagen y Aprobación",
       hipotesis: "Hipótesis a discernir: ¿Estás intentando controlar minuciosamente tu desempeño o el entorno para proteger tu imagen ante otros y evitar a toda costa el juicio o el rechazo?",
       preguntaClave: "¿Tu necesidad de control se dispara cuando sientes que la mirada evaluativa o la aprobación de los demás está en juego?",
-      direccionPastoral: "Afirmarse en la aceptación irrevocable que ya tienes en Cristo (Efesios 1:6), liberando la carga de sostener una imagen impecable ante los hombres."
+      direccionPastoral: "Afirmarse en la aceptación irrevocable que ya tienes en Cristo (Efesios 1:6), liberando la carga de sostener una imagen impecable ante los hombres.",
+      nivel: lvl2
     });
   }
 
   // Interacción 3: Control + Tiempo
-  if (controlScore >= 3 && tiempoScore >= 3) {
+  const lvl3 = getInteractionLevel(controlScore, tiempoScore);
+  if (lvl3) {
     interactions.push({
       id: "control-tiempo",
       blockA: { id: "control-entorno", name: "Control", score: controlScore },
@@ -537,12 +551,14 @@ export function detectBlockInteractions(scores: Record<string, number>): Detecte
       tag: "Parálisis por Búsqueda de Certezas",
       hipotesis: "Hipótesis a discernir: ¿La necesidad de tener todo bajo control está produciendo preparación excesiva, postergación de decisiones o una prisa angustiante por no equivocarte en el porvenir?",
       preguntaClave: "¿Demoras pasos importantes porque sientes que aún no cuentas con el 100% de las variables bajo tu dominio?",
-      direccionPastoral: "Aprender a dar pasos de fe serenos en medio de la incertidumbre, confiando en que el mañana está en las manos providenciales de Dios (Mateo 6:34)."
+      direccionPastoral: "Aprender a dar pasos de fe serenos en medio de la incertidumbre, confiando en que el mañana está en las manos providenciales de Dios (Mateo 6:34).",
+      nivel: lvl3
     });
   }
 
   // Interacción 4: Rendimiento + Merecimiento
-  if (rendimientoScore >= 3 && merecimientoScore >= 3) {
+  const lvl4 = getInteractionLevel(rendimientoScore, merecimientoScore);
+  if (lvl4) {
     interactions.push({
       id: "rendimiento-merecimiento",
       blockA: { id: "rendimiento-logro", name: "Rendimiento", score: rendimientoScore },
@@ -550,12 +566,14 @@ export function detectBlockInteractions(scores: Record<string, number>): Detecte
       tag: "Condicionamiento del Reposo a la Producción",
       hipotesis: "Hipótesis a discernir: ¿Sientes que solo mereces bienestar, descanso o afecto si antes has producido de manera intachable, creyendo que la paz debe ser 'ganada' con sudor?",
       preguntaClave: "¿Te asalta la culpa cuando intentas descansar sin haber dejado todo terminado al 100%?",
-      direccionPastoral: "Renovar el entendimiento en el principio de la Gracia: Dios te ama y te concede descanso por quién es Él, no por tu volumen de producción (Hebreos 4:9-10)."
+      direccionPastoral: "Renovar el entendimiento en el principio de la Gracia: Dios te ama y te concede descanso por quién es Él, no por tu volumen de producción (Hebreos 4:9-10).",
+      nivel: lvl4
     });
   }
 
   // Interacción 5: Rendimiento + Capacidad
-  if (rendimientoScore >= 3 && capacidadScore >= 3 && !interactions.some(i => i.id === "control-capacidad")) {
+  const lvl5 = getInteractionLevel(rendimientoScore, capacidadScore);
+  if (lvl5 && !interactions.some(i => i.id === "control-capacidad")) {
     interactions.push({
       id: "rendimiento-capacidad",
       blockA: { id: "rendimiento-logro", name: "Rendimiento", score: rendimientoScore },
@@ -563,12 +581,14 @@ export function detectBlockInteractions(scores: Record<string, number>): Detecte
       tag: "Autoexigencia de Defensa",
       hipotesis: "Hipótesis a discernir: ¿Tu perfeccionismo y exigencia de logro funcionan como una coraza para evitar que otros descubran tus dudas internas de competencia?",
       preguntaClave: "¿Te exiges un estándar sobrehumano porque temes que un error revele una supuesta 'incompetencia'?",
-      direccionPastoral: "Reconocer que el poder de Dios se perfecciona en nuestras debilidades (2 Corintios 12:9), permitiéndote ser humano sin condenación."
+      direccionPastoral: "Reconocer que el poder de Dios se perfecciona en nuestras debilidades (2 Corintios 12:9), permitiéndote ser humano sin condenación.",
+      nivel: lvl5
     });
   }
 
   // Interacción 6: Relaciones + Aceptación Social
-  if (relacionesScore >= 3 && socialScore >= 3) {
+  const lvl6 = getInteractionLevel(relacionesScore, socialScore);
+  if (lvl6) {
     interactions.push({
       id: "relaciones-social",
       blockA: { id: "relaciones-poder", name: "Relaciones", score: relacionesScore },
@@ -576,12 +596,14 @@ export function detectBlockInteractions(scores: Record<string, number>): Detecte
       tag: "Apaciguamiento por Temor al Rechazo",
       hipotesis: "Hipótesis a discernir: ¿Sueles callar en desacuerdos y ceder tus límites sanos por temor a que la tensión resulte en distanciamiento o pérdida de afecto?",
       preguntaClave: "¿Confundes la paz bíblica con el sacrificio silencioso de tus propias necesidades y convicciones?",
-      direccionPastoral: "Aprender a hablar la verdad con amor (Efesios 4:15), recordando que poner límites claros no destruye los vínculos sanos sino que los preserva."
+      direccionPastoral: "Aprender a hablar la verdad con amor (Efesios 4:15), recordando que poner límites claros no destruye los vínculos sanos sino que los preserva.",
+      nivel: lvl6
     });
   }
 
   // Interacción 7: Cuerpo + Rendimiento
-  if (cuerpoScore >= 3 && rendimientoScore >= 3) {
+  const lvl7 = getInteractionLevel(cuerpoScore, rendimientoScore);
+  if (lvl7) {
     interactions.push({
       id: "cuerpo-rendimiento",
       blockA: { id: "cuerpo-salud", name: "Cuerpo", score: cuerpoScore },
@@ -589,12 +611,14 @@ export function detectBlockInteractions(scores: Record<string, number>): Detecte
       tag: "Culpa en el Reposo Físico",
       hipotesis: "Hipótesis a discernir: ¿El descanso corporal te genera incomodidad o culpa porque tu mente lo equipara automáticamente con pereza o falta de compromiso?",
       preguntaClave: "¿Sientes que detenerte físicamente es un lujo peligroso en lugar de una mayordomía fiel del templo del Espíritu?",
-      direccionPastoral: "Honrar a Dios cuidando el cuerpo que Él te ha confiado (1 Corintios 6:19-20), recordando que el reposo es un mandato sagrado y no una debilidad."
+      direccionPastoral: "Honrar a Dios cuidando el cuerpo que Él te ha confiado (1 Corintios 6:19-20), recordando que el reposo es un mandato sagrado y no una debilidad.",
+      nivel: lvl7
     });
   }
 
   // Interacción 8: Espiritualidad + Control
-  if (espiritualidadScore >= 3 && controlScore >= 3 && !interactions.some(i => i.id === "espiritualidad-control")) {
+  const lvl8 = getInteractionLevel(espiritualidadScore, controlScore);
+  if (lvl8 && !interactions.some(i => i.id === "espiritualidad-control")) {
     interactions.push({
       id: "espiritualidad-control",
       blockA: { id: "espiritualidad-trascendencia", name: "Espiritualidad", score: espiritualidadScore },
@@ -602,12 +626,14 @@ export function detectBlockInteractions(scores: Record<string, number>): Detecte
       tag: "Tensión entre Soberanía y Vigilancia Propia",
       hipotesis: "Hipótesis a discernir: ¿Te cuesta experimentar la paz de la soberanía de Dios porque sientes que si tú no intervienes continuamente, las cosas se derrumbarán?",
       preguntaClave: "¿Tus tiempos de oración se convierten a veces en un inventario de preocupaciones más que en un espacio de entrega y reposo?",
-      direccionPastoral: "Aprender la distinción entre responsabilidad fiel y soberanía divina: tú siembras y riegas, pero el crecimiento y el sustento provienen de Dios (1 Corintios 3:6)."
+      direccionPastoral: "Aprender la distinción entre responsabilidad fiel y soberanía divina: tú siembras y riegas, pero el crecimiento y el sustento provienen de Dios (1 Corintios 3:6).",
+      nivel: lvl8
     });
   }
 
   // Interacción 9: Tiempo + Relaciones
-  if (tiempoScore >= 3 && relacionesScore >= 3) {
+  const lvl9 = getInteractionLevel(tiempoScore, relacionesScore);
+  if (lvl9) {
     interactions.push({
       id: "tiempo-relaciones",
       blockA: { id: "tiempo-futuro", name: "Tiempo", score: tiempoScore },
@@ -615,9 +641,10 @@ export function detectBlockInteractions(scores: Record<string, number>): Detecte
       tag: "Postergación de Vínculos por Urgencia",
       hipotesis: "Hipótesis a discernir: ¿La prisa y la presión del tiempo te llevan a posponer conversaciones importantes o a replegarte para no asumir el desgaste emocional de los desacuerdos?",
       preguntaClave: "¿Sientes que 'no tienes tiempo ni energía' para abordar con calma lo que ocurre en tus relaciones más cercanas?",
-      direccionPastoral: "Priorizar el amor y la comunión honesta por encima de la agenda apretada, recordando que las relaciones son el tesoro eterno del Reino."
+      direccionPastoral: "Priorizar el amor y la comunión honesta por encima de la agenda apretada, recordando que las relaciones son el tesoro eterno del Reino.",
+      nivel: lvl9
     });
   }
 
-  return interactions;
+  return interactions.sort((a, b) => (a.nivel === 'patron' ? 0 : 1) - (b.nivel === 'patron' ? 0 : 1));
 }

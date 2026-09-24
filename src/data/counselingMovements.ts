@@ -983,16 +983,24 @@ export function buildHeartExplorationMap(
 
   // Formatear datos objetivos
   const blockNames: Record<string, string> = {
+    'capacidad-identidad': 'Capacidad e Identidad',
+    'merecimiento-vinculo': 'Merecimiento y Vínculo',
     'control-entorno': 'Control y Entorno',
-    'tiempo-urgencia': 'Tiempo y Urgencia',
-    'capacidad-recursos': 'Capacidad y Recursos',
-    'identidad-autoestima': 'Identidad y Valor',
-    'aprobacion-social': 'Aceptación Social',
-    'espiritualidad-fe': 'Espiritualidad y Fe',
+    'rendimiento-logro': 'Rendimiento y Logro',
+    'relaciones-poder': 'Relaciones y Vínculos',
     'cuerpo-salud': 'Cuerpo y Salud',
-    'merecimiento-justicia': 'Merecimiento y Justicia',
-    'relaciones-confianza': 'Relaciones y Confianza',
-    'rendimiento-desempeno': 'Rendimiento y Desempeño'
+    'espiritualidad-trascendencia': 'Espiritualidad y Trascendencia',
+    'tiempo-futuro': 'Tiempo y Futuro',
+    'genero-identidad-social': 'Aceptación Social e Identidad',
+    // Compatibilidad retroactiva para claves históricas
+    'tiempo-urgencia': 'Tiempo y Futuro',
+    'capacidad-recursos': 'Capacidad e Identidad',
+    'identidad-autoestima': 'Capacidad e Identidad',
+    'aprobacion-social': 'Aceptación Social e Identidad',
+    'espiritualidad-fe': 'Espiritualidad y Trascendencia',
+    'merecimiento-justicia': 'Merecimiento y Vínculo',
+    'relaciones-confianza': 'Relaciones y Vínculos',
+    'rendimiento-desempeno': 'Rendimiento y Logro'
   };
 
   const datosObj = Object.entries(screeningScores).map(([bId, sc]) => ({
@@ -1004,15 +1012,19 @@ export function buildHeartExplorationMap(
   // Detectar relaciones
   const relaciones: string[] = [];
   const ctrlScore = screeningScores['control-entorno'] ?? 0;
-  const timeScore = screeningScores['tiempo-urgencia'] ?? 0;
-  const capScore = screeningScores['capacidad-recursos'] ?? 0;
-  const socScore = screeningScores['aprobacion-social'] ?? 0;
+  const timeScore = screeningScores['tiempo-futuro'] ?? screeningScores['tiempo-urgencia'] ?? 0;
+  const capScore = screeningScores['capacidad-identidad'] ?? screeningScores['capacidad-recursos'] ?? 0;
+  const socScore = screeningScores['genero-identidad-social'] ?? screeningScores['aprobacion-social'] ?? 0;
 
   if (ctrlScore >= 4 && timeScore >= 4) {
     relaciones.push('Cruce de alta tensión entre Control e Hiper-gestión del Tiempo: la urgencia temporal se utiliza como combustible para la supervisión constante.');
   }
   if (ctrlScore >= 4 && capScore >= 3) {
-    relaciones.push('Interacción entre Control y percepción de Capacidad: la necesidad de controlar puede ser un escudo defensivo para no exponer vacíos técnicos o límites creaturales.');
+    if (capScore >= 4) {
+      relaciones.push('Interacción entre Control y percepción de Capacidad: la necesidad de controlar puede ser un escudo defensivo para no exponer vacíos técnicos o límites creaturales.');
+    } else {
+      relaciones.push('Señal débil — a explorar: Interacción entre Control y percepción de Capacidad (posible necesidad de compensar dudas sobre recursos).');
+    }
   }
   if (socScore >= 3) {
     relaciones.push('Presencia de sensibilidad social: lo que otros opinen podría estar influyendo en el nivel de autoexigencia para evitar críticas.');
@@ -1073,20 +1085,19 @@ export const SIMULATED_CASE_19 = {
   nombre: 'Caso de Prueba Simulado (Prompt 19)',
   puntajes: {
     'control-entorno': 5,
-    'tiempo-urgencia': 5,
-    'capacidad-recursos': 3,
-    'identidad-autoestima': 3,
-    'aprobacion-social': 3,
-    'espiritualidad-fe': 3,
+    'tiempo-futuro': 5,
+    'capacidad-identidad': 3,
+    'genero-identidad-social': 3,
+    'espiritualidad-trascendencia': 3,
     'cuerpo-salud': 3,
-    'merecimiento-justicia': 2,
-    'relaciones-confianza': 2,
-    'rendimiento-desempeno': 2
+    'merecimiento-vinculo': 2,
+    'relaciones-poder': 2,
+    'rendimiento-logro': 2
   },
   interpretacionInicialUsuario: 'La persona teme ser descubierta como insuficiente, se prepara demasiado, le cuesta delegar y posterga decisiones porque necesita sentir que todo está bajo control.',
   analisisCriticoCalidad: {
     evitaSindromeImpostor: true,
-    justificacionAntietiquetas: 'El sistema NO diagnostica "Síndrome del Impostor" ni ninguna otra etiqueta clínica o psicológica secular. Reconoce objetivamente un puntaje de Control=5 y Tiempo=5 con Capacidad=3, pero plantea con honestidad que la persona podría simplemente estar sobrecargada objetivamente o carecer de metodologías de delegación.',
+    justificacionAntietiquetas: 'El sistema NO diagnostica "Síndrome del Impostor" ni ninguna otra etiqueta clínica o psicológica secular. Reconoce objetivamente un puntaje de Control=5 (control-entorno) y Tiempo=5 (tiempo-futuro) con Capacidad=3 (capacidad-identidad), pero plantea con honestidad que la persona podría simplemente estar sobrecargada objetivamente o carecer de metodologías de delegación.',
     explicacionesAlternativasObligatorias: [
       'Sobrecarga situacional real: proyectos complejos con plazos estrictos que justifican alta atención.',
       'Déficit de habilidades: nunca se le ha enseñado cómo formular mandatos de delegación con indicadores claros.',

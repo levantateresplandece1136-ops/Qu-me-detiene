@@ -29,7 +29,7 @@ if (geminiApiKey) {
 // API Route for comprehensive dynamic Christ-Centered Neuro-Spirituality Diagnosis (Fases 1-8)
 app.post("/api/diagnostico", async (req, res) => {
   try {
-    const { userName, userEmail, primaryBelief, activeBeliefs, userAge, userGoal } = req.body;
+    const { userName, userEmail, primaryBelief, activeBeliefs, userAge, userGoal, screeningAnswers = {} } = req.body;
 
     if (!userName || !primaryBelief) {
       return res.status(400).json({ error: "Missing required fields: userName and primaryBelief." });
@@ -40,6 +40,33 @@ app.post("/api/diagnostico", async (req, res) => {
       return res.json({ useFallback: true, message: "GEMINI_API_KEY is not configured on the server." });
     }
 
+    const blockTitles: Record<string, string> = {
+      "capacidad-identidad": "Capacidad e Identidad",
+      "merecimiento-vinculo": "Merecimiento y Vínculo",
+      "control-entorno": "Control y Entorno",
+      "rendimiento-logro": "Rendimiento y Logro",
+      "relaciones-poder": "Relaciones y Vínculos",
+      "cuerpo-salud": "Cuerpo y Salud",
+      "espiritualidad-trascendencia": "Espiritualidad y Trascendencia",
+      "tiempo-futuro": "Tiempo y Futuro",
+      "genero-identidad-social": "Aceptación Social e Identidad"
+    };
+
+    const screeningSummary = Object.keys(screeningAnswers).length > 0
+      ? Object.entries(screeningAnswers).map(([k, v]) => `${blockTitles[k] || k}: ${v}`).join(", ")
+      : "No provistos";
+
+    const primaryBlockTitle = blockTitles[primaryBelief.bloqueId] || primaryBelief.bloque || primaryBelief.bloqueId;
+    const primaryScore = screeningAnswers[primaryBelief.bloqueId] ?? primaryBelief.screeningScore ?? primaryBelief.score ?? 5;
+
+    const sanitizedActiveBeliefs = Array.isArray(activeBeliefs)
+      ? activeBeliefs.map((b: any) => ({
+          bloqueId: b.bloqueId,
+          afirmacionTest: b.afirmacionTest,
+          intensity: b.intensity
+        }))
+      : [];
+
     const prompt = `
 Actúa como un consejero bíblico pastoral sabio y empático, con profunda comprensión de la renovación mental (Romanos 12:2) y la consejería centrada en el Evangelio de la gracia de Cristo.
 
@@ -47,9 +74,10 @@ Tu tarea es analizar los datos de autoexploración de ${userName} (${userEmail |
 
 DATOS REPORTADOS POR EL USUARIO:
 - Nombre: ${userName}
-- Área de Mayor Intensidad Reportada: ${primaryBelief.creencia} (${primaryBelief.alias || primaryBelief.bloqueId})
+- Puntajes del screening (1 a 5) por área: ${screeningSummary}
+- Área con mayor resonancia en el screening: ${primaryBlockTitle} (${primaryScore}/5)
 - Afirmación marcada en el cuestionario: "${primaryBelief.afirmacionTest}"
-- Respuestas en otras áreas activadas: ${JSON.stringify(activeBeliefs || [])}
+- Respuestas en otras áreas activadas: ${JSON.stringify(sanitizedActiveBeliefs)}
 
 FILOSOFÍA CENTRAL DE ATENCIÓN (OBLIGATORIA):
 La aplicación NO diagnostica personas de forma dogmática ni etiqueta corazones.
@@ -68,14 +96,14 @@ Por ejemplo:
 Toda conclusión que no sea directamente observable en los datos debe redactarse como HIPÓTESIS o LÍNEA DE REFLEXIÓN a explorar.
 
 MODELO DE ANÁLISIS DEL CORAZÓN (OBLIGATORIO):
-Debes generar también el objeto "mapaDelCorazon" con esta cascada de 7 pasos:
-1. CIRCUNSTANCIA [categoryType: "sabemos", label: "CIRCUNSTANCIA", sublabel: "Contexto o detonante situacional"]: Situación concreta reportada por ${userName} a partir de su afirmación en el test ("${primaryBelief.afirmacionTest}") y su meta ("${userGoal || 'vida cotidiana'}").
-2. INTERPRETACIÓN [categoryType: "explorar", label: "INTERPRETACIÓN", sublabel: "Lectura o sentencia interna de la mente"]: Hipótesis de significado interior (ej. "Si fallo, demostraré que no soy suficientemente competente").
-3. DESEO / ANHELO [categoryType: "explorar", label: "DESEO / ANHELO", sublabel: "Lo que el corazón anhela o intenta asegurar"]: Hipótesis sobre la motivación del corazón (ej. ser considerado competente y suficiente).
-4. TEMOR [categoryType: "explorar", label: "TEMOR", sublabel: "La vulnerabilidad que se busca evitar a toda costa"]: Hipótesis sobre lo que más teme que quede expuesto (ej. ser expuesta como insuficiente).
-5. ESTRATEGIA DE CONTROL [categoryType: "explorar", label: "ESTRATEGIA DE CONTROL", sublabel: "Mecanismo humano de autoprotección"]: Hipótesis del mecanismo de la carne (ej. preparación excesiva y dificultad para delegar).
-6. RESPUESTA [categoryType: "sabemos", label: "RESPUESTA", sublabel: "Conducta manifiesta y síntoma observable"]: Conducta o reacción concreta reportada en las respuestas (ej. postergar hasta que todo esté perfecto).
-7. FRUTO / CONSECUENCIA [categoryType: "explorar", label: "FRUTO / CONSECUENCIA", sublabel: "Impacto en paz, relaciones y oportunidades"]: Hipótesis sobre el impacto desgastante (ej. ansiedad, retraso, pérdida de oportunidades y mayor sensación de insuficiencia).
+Debes generar también el objeto "mapaDelCorazon" con esta cascada de 7 pasos. Los ejemplos son solo de formato; basa el contenido en los puntajes y afirmaciones reales del usuario:
+1. CIRCUNSTANCIA [categoryType: "sabemos", label: "CIRCUNSTANCIA", sublabel: "Contexto o detonante situacional"]: Situación concreta reportada por ${userName} a partir de su afirmación en el test ("${primaryBelief.afirmacionTest}") y su meta ("${userGoal || 'vida cotidiana'}"). (ej. Sobrecarga situacional de proyectos con plazos ajustados o relaciones cotidianas).
+2. INTERPRETACIÓN [categoryType: "explorar", label: "INTERPRETACIÓN", sublabel: "Lectura o sentencia interna de la mente"]: Hipótesis de significado interior (ej. "Si no anticipo cada detalle, las cosas se desbordarán" o "Debo garantizar que todo salga bien").
+3. DESEO / ANHELO [categoryType: "explorar", label: "DESEO / ANHELO", sublabel: "Lo que el corazón anhela o intenta asegurar"]: Hipótesis sobre la motivación del corazón (ej. seguridad, paz, honrar a Dios con fidelidad o agradar a los demás).
+4. TEMOR [categoryType: "explorar", label: "TEMOR", sublabel: "La vulnerabilidad que se busca evitar a toda costa"]: Hipótesis sobre lo que más teme que quede expuesto (ej. incertidumbre, descontrol, rechazo o decepcionar a otros).
+5. ESTRATEGIA DE CONTROL [categoryType: "explorar", label: "ESTRATEGIA DE CONTROL", sublabel: "Mecanismo humano de autoprotección"]: Hipótesis del mecanismo de respuesta (ej. hipervigilancia, asumir más tareas de las debidas o repliegue defensivo).
+6. RESPUESTA [categoryType: "sabemos", label: "RESPUESTA", sublabel: "Conducta manifiesta y síntoma observable"]: Conducta o reacción concreta reportada en las respuestas (ej. postergar decisiones o revisar minuciosamente lo ajeno).
+7. FRUTO / CONSECUENCIA [categoryType: "explorar", label: "FRUTO / CONSECUENCIA", sublabel: "Impacto en paz, relaciones y oportunidades"]: Hipótesis sobre el impacto desgastante (ej. tensión física, dificultad para reposar o desgaste relacional).
 
 INTERACCIONES ENTRE BLOQUES (OBLIGATORIO):
 Identifica 1 a 3 hipótesis de interacciones activas entre los bloques con puntajes notables del usuario (ejemplo: Control + Capacidad -> ¿controlar para compensar insuficiencia?; Control + Aceptación Social -> ¿controlar para proteger imagen?; Control + Tiempo -> ¿control generando sobrepreparación y retrasos?; Rendimiento + Merecimiento -> ¿condicionar el reposo a la producción?).
