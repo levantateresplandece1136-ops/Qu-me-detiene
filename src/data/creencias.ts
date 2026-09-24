@@ -21,42 +21,51 @@ export interface CreenciaRecord {
   scoreMax: number;
 }
 
-export const bloquesDiagnostico: Record<string, { title: string; screeningPhrase: string }> = {
+export const bloquesDiagnostico: Record<string, { title: string; shortTitle: string; screeningPhrase: string }> = {
   "capacidad-identidad": {
     title: "Capacidad e Identidad",
-    screeningPhrase: "Cuando tengo que hacer algo importante, una voz interna me dice que no estoy lo suficientemente preparado."
+    shortTitle: "Capacidad",
+    screeningPhrase: "Cuando tengo que hacer algo importante, una voz interna me dice que no estoy lo suficientemente preparado/a."
   },
   "merecimiento-vinculo": {
     title: "Merecimiento y Vínculo",
+    shortTitle: "Merecimiento",
     screeningPhrase: "Cuando las cosas me van bien, espero que algo salga mal pronto."
   },
   "control-entorno": {
     title: "Control y Entorno",
-    screeningPhrase: "Siento que mis circunstancias externas tienen más poder sobre mi vida que mis propias decisiones."
+    shortTitle: "Control",
+    screeningPhrase: "Siento que las circunstancias externas o imprevistos me desbordan y necesito vigilarlo todo."
   },
   "rendimiento-logro": {
     title: "Rendimiento y Logro",
-    screeningPhrase: "No entrego o publico algo hasta que está perfecto, aunque eso tome mucho más tiempo."
+    shortTitle: "Rendimiento",
+    screeningPhrase: "No entrego o comparto algo hasta que está perfecto, aunque eso tome mucho más tiempo."
   },
   "relaciones-poder": {
-    title: "Relaciones y Poder",
-    screeningPhrase: "En los conflictos, siento que alguien tiene que ceder y generalmente soy yo o tengo que ganar."
+    title: "Relaciones y Vínculos",
+    shortTitle: "Relaciones",
+    screeningPhrase: "En los desacuerdos, suelo callar y ceder para evitar conflictos, o ponerme a la defensiva."
   },
   "cuerpo-salud": {
     title: "Cuerpo y Salud",
-    screeningPhrase: "Me cuesta descansar sin sentirme culpable por el tiempo que estoy perdiendo."
+    shortTitle: "Cuerpo",
+    screeningPhrase: "Me cuesta descansar sin sentir culpa por el tiempo que creo que estoy perdiendo."
   },
   "espiritualidad-trascendencia": {
     title: "Espiritualidad y Trascendencia",
-    screeningPhrase: "A veces siento que Dios está lejos o que mi vida no tiene un propósito claro."
+    shortTitle: "Espiritualidad",
+    screeningPhrase: "A veces siento que Dios está distante o me cuesta encontrar claridad sobre mi propósito."
   },
   "tiempo-futuro": {
     title: "Tiempo y Futuro",
-    screeningPhrase: "Me preocupa constantemente no tener suficiente tiempo o tomar la decisión equivocada."
+    shortTitle: "Tiempo",
+    screeningPhrase: "Siento prisa constante por el tiempo o temo tomar una decisión equivocada sobre el futuro."
   },
   "genero-identidad-social": {
-    title: "Género e Identidad Social",
-    screeningPhrase: "Mi origen, género o historia personal me limita de alcanzar lo que realmente deseo."
+    title: "Aceptación Social e Identidad",
+    shortTitle: "Aceptación Social",
+    screeningPhrase: "Siento que la mirada, el juicio, el origen o la aprobación de los demás condicionan mis decisiones."
   }
 };
 

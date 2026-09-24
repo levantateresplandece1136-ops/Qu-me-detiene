@@ -37,7 +37,7 @@ export const downloadPDFResults = (
     doc.setDrawColor(220, 220, 220);
     doc.setLineWidth(0.1);
     doc.line(margin, pageHeight - 15, pageWidth - margin, pageHeight - 15);
-    doc.text(`Participante: ${userName}  |  Desarrollado por Josue Cortes`, margin, pageHeight - 10);
+    doc.text(`Participante: ${userName}  |  Ministerio Levántate Resplandece`, margin, pageHeight - 10);
     doc.text(`Página ${pageNum}`, pageWidth - margin - 15, pageHeight - 10);
   };
 
@@ -103,12 +103,7 @@ export const downloadPDFResults = (
     doc.setFont("Helvetica", "bold");
     doc.setFontSize(10);
     doc.setTextColor(50, 50, 50);
-    doc.text("Josue Cortes", margin + 10, y);
-    y += 4;
-    doc.setFont("Helvetica", "normal");
-    doc.setFontSize(8);
-    doc.setTextColor(120, 120, 120);
-    doc.text("Dirección Ministerial y Neuro-Pastoral", margin + 10, y);
+    doc.text("Ministerio Levántate Resplandece", margin + 10, y);
 
     drawFooter();
     doc.addPage();
@@ -174,23 +169,134 @@ export const downloadPDFResults = (
   };
 
   // SECTION 1
-  writeHeading("FASE 1 Y 2: IDENTIFICACIÓN Y DIAGNÓSTICO COGNITIVO");
-  writeKeyValue("Creencia Principal", aiDiagnosis?.fase1?.principalBelief || (results && results[0]?.creencia));
-  writeKeyValue("Temor Raíz", aiDiagnosis?.fase1?.rootFear || 'Temor de rechazo / de fracaso.');
-  writeKeyValue("Emoción Dominante", aiDiagnosis?.fase1?.dominantEmotion || 'Ansiedad / Hipervigilancia');
-  writeKeyValue("Área Afectada", aiDiagnosis?.fase1?.affectedArea || 'Identidad y Ministerio');
+  writeHeading("FASE 1 Y 2: MAPA DE EXPLORACIÓN Y DISCERNIMIENTO PASTORAL");
   
-  y += 2;
-  writeTextBlock(
-    "❌ MENTIRA RAÍZ DETECTADA EN SCRIPT INCONSCIENTE", 
-    aiDiagnosis?.fase2?.rootLie || 'Mi valía y capacidad dependen de mi esfuerzo carnal y de cumplir las expectativas.',
-    true
-  );
-  writeTextBlock(
-    "💬 MECANISMO DE AUTOSABOTAJE OBSERVADO",
-    aiDiagnosis?.fase2?.selfSabotageMechanism || 'Postergación rumiante incesante buscando perfeccionismo de desempeño.',
-    false
-  );
+  if (aiDiagnosis?.exploratorio) {
+    const exp = aiDiagnosis.exploratorio;
+    writeTextBlock("1. DATO OBSERVABLE REPORTADO", exp.dato.descripcion, false);
+    writeTextBlock("2. PATRÓN CONDUCTUAL OBSERVABLE", exp.patron.observacion, false);
+
+    checkNewPage(35);
+    doc.setFont("Helvetica", "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(40, 40, 40);
+    doc.text("3. HIPÓTESIS DE TRABAJO (A DISCERNIR, NO ETIQUETAS FIJAS):", margin, y);
+    y += 6;
+    exp.hipotesis.forEach((h: any) => {
+      writeKeyValue(h.titulo, h.descripcion);
+    });
+
+    checkNewPage(30);
+    doc.setFont("Helvetica", "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(40, 40, 40);
+    doc.text("4. PREGUNTAS PARA EXPLORAR EN ORACIÓN Y CONSEJERÍA:", margin, y);
+    y += 6;
+    exp.preguntasPorExplorar.forEach((p: string, idx: number) => {
+      writeKeyValue(`Pregunta ${idx + 1}`, p);
+    });
+
+    writeTextBlock("5. DIRECCIÓN DE AYUDA Y GRACIA", exp.direccionDeAyuda.enfoque, false);
+  } else {
+    writeKeyValue("Patrón Principal", aiDiagnosis?.fase1?.principalBelief || (results && results[0]?.creencia));
+    writeKeyValue("Hipótesis de Temor", aiDiagnosis?.fase1?.rootFear || 'Temor a la incertidumbre o al error.');
+    writeKeyValue("Emoción Frecuente", aiDiagnosis?.fase1?.dominantEmotion || 'Inquietud o sobrecarga');
+    writeKeyValue("Área Más Sensible", aiDiagnosis?.fase1?.affectedArea || 'Vida Diaria y Relaciones');
+    
+    y += 2;
+    writeTextBlock(
+      "❌ HIPÓTESIS DE CREENCIA A CONTRASTAR", 
+      aiDiagnosis?.fase2?.rootLie || 'Mi valía y seguridad dependen de mi propio control.',
+      true
+    );
+    writeTextBlock(
+      "💬 TENDENCIA OBSERVABLE DE FRENO INVOLUNTARIO",
+      aiDiagnosis?.fase2?.selfSabotageMechanism || 'Postergación o hipervigilancia excesiva.',
+      false
+    );
+  }
+
+  // MODELO DE ANÁLISIS DEL CORAZÓN (7 NIVELES)
+  if (aiDiagnosis?.mapaDelCorazon) {
+    const map = aiDiagnosis.mapaDelCorazon;
+    writeHeading("MODELO DE ANÁLISIS DEL CORAZÓN (DINÁMICA BÍBLICA: CIRCUNSTANCIA → FRUTO)");
+
+    const writeHeartStep = (label: string, text: string, type: 'sabemos' | 'explorar', detail: string) => {
+      const isKnown = type === 'sabemos';
+      const badge = isKnown ? "[LO QUE SABEMOS - DATO REPORTADO]" : "[PROPUESTO PARA EXPLORAR - HIPÓTESIS]";
+      const wrappedText = doc.splitTextToSize(text || "No provisto", maxWidth - 16);
+      const neededHeight = (wrappedText.length * 5) + 16;
+      checkNewPage(neededHeight);
+
+      doc.setFillColor(isKnown ? 240 : 254, isKnown ? 253 : 250, isKnown ? 244 : 235);
+      doc.setDrawColor(isKnown ? 74 : 201, isKnown ? 180 : 168, isKnown ? 120 : 76);
+      doc.setLineWidth(0.4);
+      doc.rect(margin, y, maxWidth, (wrappedText.length * 5) + 12, "FD");
+
+      y += 5;
+      doc.setFont("Helvetica", "bold");
+      doc.setFontSize(8.5);
+      doc.setTextColor(isKnown ? 21 : 133, isKnown ? 128 : 97, isKnown ? 61 : 33);
+      doc.text(`${label} • ${badge}`, margin + 5, y);
+
+      y += 4.5;
+      doc.setFont("Helvetica", "bold");
+      doc.setFontSize(9);
+      doc.setTextColor(30, 30, 30);
+      doc.text(wrappedText, margin + 5, y);
+
+      y += (wrappedText.length * 5) + 0.5;
+      doc.setFont("Helvetica", "italic");
+      doc.setFontSize(7.5);
+      doc.setTextColor(120, 120, 120);
+      doc.text(detail, margin + 5, y);
+      y += 6;
+    };
+
+    writeHeartStep("1. CIRCUNSTANCIA", map.circunstancia?.contenido, "sabemos", "Dato confirmado: Situación y respuestas reportadas en el test.");
+    writeHeartStep("2. INTERPRETACIÓN", map.interpretacion?.contenido, "explorar", "Hipótesis pastoral: Lectura o sentencia interna de la mente.");
+    writeHeartStep("3. DESEO / ANHELO", map.deseo?.contenido, "explorar", "Hipótesis del corazón: Anhelo profundo o ídolo sutil.");
+    writeHeartStep("4. TEMOR", map.temor?.contenido, "explorar", "Hipótesis de raíz: Vulnerabilidad que se busca evitar.");
+    writeHeartStep("5. ESTRATEGIA DE CONTROL", map.estrategiaControl?.contenido, "explorar", "Hipótesis de mecanismo: Maniobra de autoprotección humana.");
+    writeHeartStep("6. RESPUESTA", map.respuesta?.contenido, "sabemos", "Dato confirmado: Conducta manifiesta reportada en el cuestionario.");
+    writeHeartStep("7. FRUTO / CONSECUENCIA", map.fruto?.contenido, "explorar", "Hipótesis de impacto: Consecuencias emocionales y relacionales a validar.");
+  }
+
+  // Cross-block interactions
+  if (aiDiagnosis?.interacciones && aiDiagnosis.interacciones.length > 0) {
+    checkNewPage(45);
+    doc.setFont("Helvetica", "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(201, 168, 76);
+    doc.text("🔗 INTERACCIONES DETECTADAS ENTRE BLOQUES (HIPÓTESIS DE TRABAJO):", margin, y);
+    y += 6;
+
+    aiDiagnosis.interacciones.forEach((inter) => {
+      checkNewPage(32);
+      doc.setFillColor(250, 248, 240);
+      doc.setDrawColor(201, 168, 76);
+      doc.roundedRect(margin, y, maxWidth, 24, 2, 2, "FD");
+
+      doc.setFont("Helvetica", "bold");
+      doc.setFontSize(8.5);
+      doc.setTextColor(40, 40, 40);
+      doc.text(`[${inter.blockA.name} ${inter.blockA.score}/5]  ↔  [${inter.blockB.name} ${inter.blockB.score}/5]  —  ${inter.tag}`, margin + 4, y + 5);
+
+      doc.setFont("Helvetica", "normal");
+      doc.setFontSize(8);
+      doc.setTextColor(60, 60, 60);
+      const splitHyp = doc.splitTextToSize(inter.hipotesis, maxWidth - 8);
+      doc.text(splitHyp.slice(0, 2), margin + 4, y + 10);
+
+      doc.setFont("Helvetica", "italic");
+      doc.setFontSize(7.5);
+      doc.setTextColor(120, 100, 60);
+      const splitQ = doc.splitTextToSize(`Pregunta clave: ${inter.preguntaClave}`, maxWidth - 8);
+      doc.text(splitQ[0] || "", margin + 4, y + 20);
+
+      y += 28;
+    });
+  }
 
   y += 2;
   checkNewPage(40);
@@ -382,10 +488,10 @@ export const downloadPDFResults = (
   doc.line(margin, y, pageWidth - margin, y);
   y += 6;
   doc.setFont("Helvetica", "bold").setFontSize(8.5).setTextColor(80, 80, 80);
-  doc.text("Desarrollado con amor y rigor pastoral por Josue Cortes • Transformación Interior", margin, y);
+  doc.text("Desarrollado con amor y cuidado pastoral por Levántate Resplandece • Transformación Interior", margin, y);
   y += 5;
   doc.setFont("Helvetica", "normal").setFontSize(7.5).setTextColor(120, 120, 120);
-  doc.text("Canal de WhatsApp Oficial: wa.me/5491122334455  |  Canal Digital: levantateresplandece1136.com", margin, y);
+  doc.text("Herramienta de autoexploración basada en principios de consejería bíblica. No es un diagnóstico clínico ni sustituye la atención profesional.", margin, y);
 
   // Finalize document page count and draw header/footer on last page
   drawFooter();

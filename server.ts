@@ -29,41 +29,72 @@ if (geminiApiKey) {
 // API Route for comprehensive dynamic Christ-Centered Neuro-Spirituality Diagnosis (Fases 1-8)
 app.post("/api/diagnostico", async (req, res) => {
   try {
-    const { userName, userEmail, primaryBelief, activeBeliefs } = req.body;
+    const { userName, userEmail, primaryBelief, activeBeliefs, userAge, userGoal } = req.body;
 
     if (!userName || !primaryBelief) {
       return res.status(400).json({ error: "Missing required fields: userName and primaryBelief." });
     }
 
     if (!aiClient) {
-      // Return flag indicating that AI is not configged, so frontend must fall back
+      // Return flag indicating that AI is not configured, so frontend must fall back
       return res.json({ useFallback: true, message: "GEMINI_API_KEY is not configured on the server." });
     }
 
     const prompt = `
-Actúa como un experto de calibre mundial en neurociencia de la fe, consejería bíblica pastoral profunda, psicología de la reestructuración cognitiva, coaching de transformación espiritual y discipulado cristiano centrado en la gracia de Cristo.
+Actúa como un consejero bíblico pastoral sabio y empático, con profunda comprensión de la renovación mental (Romanos 12:2) y la consejería centrada en el Evangelio de la gracia de Cristo.
 
-Tu tarea es analizar los datos de diagnóstico de ${userName} (${userEmail || "Sin correo"}) para generar un diagnóstico e itinerario de renovación mental y de filiación incondicional de 8 Fases.
+Tu tarea es analizar los datos de autoexploración de ${userName} (${userEmail || "Sin correo"}, Rango de edad: ${userAge || "No especificada"}, Meta vital de enfoque: ${userGoal || "Crecimiento integral"}) para generar un mapa de discernimiento, hipótesis de trabajo y un itinerario devocional de 30 días.
 
-DATOS DEL USUARIO:
+DATOS REPORTADOS POR EL USUARIO:
 - Nombre: ${userName}
-- Creencia Limitante Principal Detectada: ${primaryBelief.creencia} (${primaryBelief.alias})
-- Descripción de Impacto: ${primaryBelief.impacto}
-- Aspecto Neurobiológico de esta creencia: ${primaryBelief.neuro}
-- Declaración de Temor: "${primaryBelief.afirmacionTest}"
-- Respuestas de apoyo / creencias secundarias activadas en su diagnóstico: ${JSON.stringify(activeBeliefs)}
+- Área de Mayor Intensidad Reportada: ${primaryBelief.creencia} (${primaryBelief.alias || primaryBelief.bloqueId})
+- Afirmación marcada en el cuestionario: "${primaryBelief.afirmacionTest}"
+- Respuestas en otras áreas activadas: ${JSON.stringify(activeBeliefs || [])}
 
-Debes generar una análisis pastoral y científico profundo estructurado de acuerdo con el siguiente formato JSON. Adhiérete estrictamente a los pilares de la VERDAD BÍBLICA, la GRACIA DE CRISTO, la NEUROPLASTICIDAD como herramienta de aprendizaje diseñada por Dios, y la ACCIÓN CONSISTENTE. No uses autodecretos humanistas, ley de atracción ni psicología secular de forma auto-idólatra. Toda la gloria y fuerza provienen del Salvador Jesucristo.
+FILOSOFÍA CENTRAL DE ATENCIÓN (OBLIGATORIA):
+La aplicación NO diagnostica personas de forma dogmática ni etiqueta corazones.
+Sigue estrictamente el principio:
+DATOS → PATRONES → HIPÓTESIS → VALIDACIÓN → DIRECCIÓN DE AYUDA.
+NUNCA presentes una inferencia o conjetura interna como un hecho incuestionable.
+Por ejemplo:
+- NO digas: "Control = 5. La raíz de tu corazón es miedo al rechazo y síndrome del impostor."
+- SÍ debes formular:
+  1. DATO: "Puntaje de 5/5 reportado en Control y Entorno."
+  2. PATRÓN: "Existe una fuerte necesidad percibida de control, supervisión exhaustiva y vigilancia del entorno."
+  3. HIPÓTESIS: "Este patrón podría estar relacionado con: (A) Búsqueda de seguridad por temor a la incertidumbre, (B) Perfeccionismo protector por miedo a la crítica o al error, o (C) Sobrecarga circunstancial acumulada por falta de apoyo."
+  4. PREGUNTAS POR EXPLORAR: "¿Qué imaginas que ocurriría si sueltas la supervisión de esto? ¿Qué temes en el fondo que se desborde?"
+  5. DIRECCIÓN DE AYUDA: "Aprender a discernir entre responsabilidad fiel y control ansioso, descansando en la gracia y soberanía de Cristo."
 
+Toda conclusión que no sea directamente observable en los datos debe redactarse como HIPÓTESIS o LÍNEA DE REFLEXIÓN a explorar.
+
+MODELO DE ANÁLISIS DEL CORAZÓN (OBLIGATORIO):
+Debes generar también el objeto "mapaDelCorazon" con esta cascada de 7 pasos:
+1. CIRCUNSTANCIA [categoryType: "sabemos", label: "CIRCUNSTANCIA", sublabel: "Contexto o detonante situacional"]: Situación concreta reportada por ${userName} a partir de su afirmación en el test ("${primaryBelief.afirmacionTest}") y su meta ("${userGoal || 'vida cotidiana'}").
+2. INTERPRETACIÓN [categoryType: "explorar", label: "INTERPRETACIÓN", sublabel: "Lectura o sentencia interna de la mente"]: Hipótesis de significado interior (ej. "Si fallo, demostraré que no soy suficientemente competente").
+3. DESEO / ANHELO [categoryType: "explorar", label: "DESEO / ANHELO", sublabel: "Lo que el corazón anhela o intenta asegurar"]: Hipótesis sobre la motivación del corazón (ej. ser considerado competente y suficiente).
+4. TEMOR [categoryType: "explorar", label: "TEMOR", sublabel: "La vulnerabilidad que se busca evitar a toda costa"]: Hipótesis sobre lo que más teme que quede expuesto (ej. ser expuesta como insuficiente).
+5. ESTRATEGIA DE CONTROL [categoryType: "explorar", label: "ESTRATEGIA DE CONTROL", sublabel: "Mecanismo humano de autoprotección"]: Hipótesis del mecanismo de la carne (ej. preparación excesiva y dificultad para delegar).
+6. RESPUESTA [categoryType: "sabemos", label: "RESPUESTA", sublabel: "Conducta manifiesta y síntoma observable"]: Conducta o reacción concreta reportada en las respuestas (ej. postergar hasta que todo esté perfecto).
+7. FRUTO / CONSECUENCIA [categoryType: "explorar", label: "FRUTO / CONSECUENCIA", sublabel: "Impacto en paz, relaciones y oportunidades"]: Hipótesis sobre el impacto desgastante (ej. ansiedad, retraso, pérdida de oportunidades y mayor sensación de insuficiencia).
+
+INTERACCIONES ENTRE BLOQUES (OBLIGATORIO):
+Identifica 1 a 3 hipótesis de interacciones activas entre los bloques con puntajes notables del usuario (ejemplo: Control + Capacidad -> ¿controlar para compensar insuficiencia?; Control + Aceptación Social -> ¿controlar para proteger imagen?; Control + Tiempo -> ¿control generando sobrepreparación y retrasos?; Rendimiento + Merecimiento -> ¿condicionar el reposo a la producción?).
+NO asumas que un bloque alto significa automáticamente un problema. Formula estas interacciones SIEMPRE como HIPÓTESIS de discernimiento con su correspondiente pregunta clave de exploración pastoral.
+
+Distingue nítidamente: "sabemos" ("Lo que sabemos") para datos reportados, de "explorar" ("Lo que estamos proponiendo explorar") para hipótesis del corazón.
 Estructura el JSON devuelto conforme al responseSchema configurado. No añadas explicaciones fuera del JSON.
 `;
 
     const systemInstruction = `
-Eres un consejero bíblico y pastor con amplio dominio en neurociencia cognitiva y plasticidad neural (dirigida por la verdad de Romanos 12:2).
-Tu tono es compasivo, solemne, clínico-pastoral, profundamente sincero y lleno de fe en la obra terminada de Cristo Jesús.
-Evitas ideas de atracción, manifestación o declaraciones de autosuficiencia humanista ("yo soy el capitán de mi destino"). Al contrario, declaras herencia por filiación, adopción y redención inmerecida.
-Genera un plan de 30 días real, interactivo, profundo, no repetitivo y de alta calidad pastoral.
+Eres un consejero bíblico pastoral del ministerio Levántate Resplandece.
+Tu tono es compasivo, cálido, respetuoso, libre de condenación y profundamente centrado en la gracia redentora de Jesucristo.
+NUNCA etiquetes a la persona con diagnósticos psicológicos cerrados ni afirmaciones deterministas sobre su corazón.
+Trata todo síntoma interior como una HIPÓTESIS pastoral a discernir conjuntamente con el usuario y en oración.
+Usa un español sencillo, humano y edificante. No uses términos rebuscados ni exageraciones clínicas o pseudo-neurocientíficas.
+Cita siempre el versículo bíblico con su texto exacto y referencia bíblica clara (ej. Proverbios 3:5-6).
+Personaliza las 4 dimensiones de costo a la luz del área dominante y la meta vital seleccionada (${userGoal || "vida diaria"}).
 `;
+
 
     const response = await aiClient.models.generateContent({
       model: "gemini-3.5-flash",
@@ -75,32 +106,196 @@ Genera un plan de 30 días real, interactivo, profundo, no repetitivo y de alta 
           type: Type.OBJECT,
           required: ["fase1", "fase2", "fase3", "fase4", "fase5", "fase6", "reporteFinal"],
           properties: {
+            exploratorio: {
+              type: Type.OBJECT,
+              description: "Estructura de exploración no determinista: DATO, PATRÓN, HIPÓTESIS, PREGUNTAS, VALIDACIÓN, DIRECCIÓN",
+              properties: {
+                dato: {
+                  type: Type.OBJECT,
+                  properties: {
+                    bloque: { type: Type.STRING },
+                    score: { type: Type.NUMBER },
+                    descripcion: { type: Type.STRING }
+                  }
+                },
+                patron: {
+                  type: Type.OBJECT,
+                  properties: {
+                    titulo: { type: Type.STRING },
+                    observacion: { type: Type.STRING }
+                  }
+                },
+                hipotesis: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      id: { type: Type.STRING },
+                      titulo: { type: Type.STRING },
+                      descripcion: { type: Type.STRING }
+                    }
+                  }
+                },
+                preguntasPorExplorar: {
+                  type: Type.ARRAY,
+                  items: { type: Type.STRING }
+                },
+                validacion: {
+                  type: Type.OBJECT,
+                  properties: {
+                    mensaje: { type: Type.STRING },
+                    opciones: { type: Type.ARRAY, items: { type: Type.STRING } }
+                  }
+                },
+                direccionDeAyuda: {
+                  type: Type.OBJECT,
+                  properties: {
+                    enfoque: { type: Type.STRING },
+                    pasoInmediato: { type: Type.STRING },
+                    acompanamientoRecomendado: { type: Type.STRING }
+                  }
+                }
+              }
+            },
+            mapaDelCorazon: {
+              type: Type.OBJECT,
+              description: "MODELO DE ANÁLISIS DEL CORAZÓN (7 NIVELES: CIRCUNSTANCIA -> FRUTO)",
+              properties: {
+                circunstancia: {
+                  type: Type.OBJECT,
+                  properties: {
+                    step: { type: Type.STRING },
+                    label: { type: Type.STRING },
+                    sublabel: { type: Type.STRING },
+                    categoryType: { type: Type.STRING },
+                    contenido: { type: Type.STRING },
+                    justificacion: { type: Type.STRING }
+                  }
+                },
+                interpretacion: {
+                  type: Type.OBJECT,
+                  properties: {
+                    step: { type: Type.STRING },
+                    label: { type: Type.STRING },
+                    sublabel: { type: Type.STRING },
+                    categoryType: { type: Type.STRING },
+                    contenido: { type: Type.STRING },
+                    justificacion: { type: Type.STRING }
+                  }
+                },
+                deseo: {
+                  type: Type.OBJECT,
+                  properties: {
+                    step: { type: Type.STRING },
+                    label: { type: Type.STRING },
+                    sublabel: { type: Type.STRING },
+                    categoryType: { type: Type.STRING },
+                    contenido: { type: Type.STRING },
+                    justificacion: { type: Type.STRING }
+                  }
+                },
+                temor: {
+                  type: Type.OBJECT,
+                  properties: {
+                    step: { type: Type.STRING },
+                    label: { type: Type.STRING },
+                    sublabel: { type: Type.STRING },
+                    categoryType: { type: Type.STRING },
+                    contenido: { type: Type.STRING },
+                    justificacion: { type: Type.STRING }
+                  }
+                },
+                estrategiaControl: {
+                  type: Type.OBJECT,
+                  properties: {
+                    step: { type: Type.STRING },
+                    label: { type: Type.STRING },
+                    sublabel: { type: Type.STRING },
+                    categoryType: { type: Type.STRING },
+                    contenido: { type: Type.STRING },
+                    justificacion: { type: Type.STRING }
+                  }
+                },
+                respuesta: {
+                  type: Type.OBJECT,
+                  properties: {
+                    step: { type: Type.STRING },
+                    label: { type: Type.STRING },
+                    sublabel: { type: Type.STRING },
+                    categoryType: { type: Type.STRING },
+                    contenido: { type: Type.STRING },
+                    justificacion: { type: Type.STRING }
+                  }
+                },
+                fruto: {
+                  type: Type.OBJECT,
+                  properties: {
+                    step: { type: Type.STRING },
+                    label: { type: Type.STRING },
+                    sublabel: { type: Type.STRING },
+                    categoryType: { type: Type.STRING },
+                    contenido: { type: Type.STRING },
+                    justificacion: { type: Type.STRING }
+                  }
+                }
+              }
+            },
+            interacciones: {
+              type: Type.ARRAY,
+              description: "Hipótesis de interacciones detectadas entre bloques del usuario",
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  id: { type: Type.STRING },
+                  blockA: {
+                    type: Type.OBJECT,
+                    properties: {
+                      id: { type: Type.STRING },
+                      name: { type: Type.STRING },
+                      score: { type: Type.NUMBER }
+                    }
+                  },
+                  blockB: {
+                    type: Type.OBJECT,
+                    properties: {
+                      id: { type: Type.STRING },
+                      name: { type: Type.STRING },
+                      score: { type: Type.NUMBER }
+                    }
+                  },
+                  tag: { type: Type.STRING },
+                  hipotesis: { type: Type.STRING },
+                  preguntaClave: { type: Type.STRING },
+                  direccionPastoral: { type: Type.STRING }
+                }
+              }
+            },
             fase1: {
               type: Type.OBJECT,
-              description: "Fase 1: Identificación y categorización de la creencia",
+              description: "Fase 1: Identificación y categorización de la conducta",
               required: ["principalBelief", "secondaryBeliefs", "rootFear", "dominantEmotion", "affectedArea"],
               properties: {
-                principalBelief: { type: Type.STRING, description: "La creencia limitadora primordial identificada" },
+                principalBelief: { type: Type.STRING, description: "Patrón u observación conductual principal reportada" },
                 secondaryBeliefs: { 
                   type: Type.ARRAY, 
                   items: { type: Type.STRING },
-                  description: "2 o 3 creencias limitantes complementarias o relacionadas"
+                  description: "2 o 3 áreas secundarias de tensión reportadas"
                 },
-                rootFear: { type: Type.STRING, description: "El temor subyacente absoluto que sustenta esta mentira" },
-                dominantEmotion: { type: Type.STRING, description: "La emoción crónica predominante (ej. angustia, culpa, apatía, frustración)" },
-                affectedArea: { type: Type.STRING, description: "La esfera vital más herida (ej. Identidad, Finanzas, Matrimonio, Liderazgo, etc.)" }
+                rootFear: { type: Type.STRING, description: "Hipótesis de temor subyacente a discernir" },
+                dominantEmotion: { type: Type.STRING, description: "Emoción frecuente manifestada (ej. cansancio, inquietud, autoexigencia)" },
+                affectedArea: { type: Type.STRING, description: "Área vital más sensible (ej. Identidad, Finanzas, Matrimonio, Liderazgo)" }
               }
             },
             fase2: {
               type: Type.OBJECT,
-              description: "Fase 2: Diagnóstico profundo del problema",
+              description: "Fase 2: Exploración profunda mediante Datos, Patrón, Hipótesis y Preguntas",
               required: ["limitingBeliefExplanation", "rootLie", "currentCost", "selfSabotageMechanism"],
               properties: {
-                limitingBeliefExplanation: { type: Type.STRING, description: "Análisis neuro-espiritual de la creencia" },
-                rootLie: { type: Type.STRING, description: "La mentira del diablo o de la carne que el usuario asume involuntariamente" },
+                limitingBeliefExplanation: { type: Type.STRING, description: "Análisis estructurado con DATO, PATRÓN, HIPÓTESIS y PREGUNTAS POR EXPLORAR" },
+                rootLie: { type: Type.STRING, description: "Hipótesis de creencia limitante a contrastar con la Verdad de Dios" },
                 currentCost: {
                   type: Type.OBJECT,
-                  description: "Efectos limitantes reales en las 4 dimensiones vitales",
+                  description: "Efectos en las 4 dimensiones vitales",
                   required: ["decisions", "emotions", "relationships", "potentialFuture"],
                   properties: {
                     decisions: { type: Type.STRING, description: "Costo en la toma de decisiones diarias" },
