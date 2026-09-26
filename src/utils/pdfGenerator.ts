@@ -5,7 +5,8 @@ export const downloadPDFResults = (
   userEmail: string,
   aiDiagnosis: any,
   results: any[],
-  journalNotes: Record<string | number, string>
+  journalNotes: Record<string | number, string>,
+  interactionConfidenceLevels?: Record<string, string>
 ) => {
   const doc = new jsPDF({
     orientation: "portrait",
@@ -302,10 +303,12 @@ export const downloadPDFResults = (
       doc.roundedRect(margin, y, maxWidth, 24, 2, 2, "FD");
 
       const signalPrefix = inter.nivel === 'senal' ? '(A explorar) ' : '';
+      const confLevel = interactionConfidenceLevels?.[inter.id];
+      const confSuffix = confLevel ? ` — Confianza: ${confLevel}` : '';
       doc.setFont("Helvetica", "bold");
       doc.setFontSize(8.5);
       doc.setTextColor(40, 40, 40);
-      doc.text(`${signalPrefix}[${inter.blockA.name} ${inter.blockA.score}/5]  ↔  [${inter.blockB.name} ${inter.blockB.score}/5]  —  ${inter.tag}`, margin + 4, y + 5);
+      doc.text(`${signalPrefix}[${inter.blockA.name} ${inter.blockA.score}/5]  ↔  [${inter.blockB.name} ${inter.blockB.score}/5]  —  ${inter.tag}${confSuffix}`, margin + 4, y + 5);
 
       doc.setFont("Helvetica", "normal");
       doc.setFontSize(8);

@@ -43,6 +43,13 @@ import { downloadPDFResults } from './utils/pdfGenerator';
 import GoldenCelebration from './components/GoldenCelebration';
 import { HeartExplorationSection } from './components/HeartExplorationSection';
 import { SIMULATED_CASE_19 } from './data/counselingMovements';
+import GuidedExplorationFlow from './components/GuidedExplorationFlow';
+import { 
+  evaluateHypothesisConfidence, 
+  getConfidenceBadgeProps, 
+  ConfidenceLevel, 
+  ConfidenceEvaluation 
+} from './utils/confidenceScorer';
 
 export interface UserResult extends CreenciaRecord {
   category: string;
@@ -132,14 +139,16 @@ const getDeepDivePastoralFeedback = (bloque: string, score: number, name: string
 };
 
 const getExploradorLevel = (xp: number) => {
-  if (xp >= 600) return { title: "Arquitecto de Vida 👑", lvl: 7, nextXp: 700 };
-  if (xp >= 500) return { title: "Transformador 🔥", lvl: 6, nextXp: 600 };
-  if (xp >= 400) return { title: "Renovador ✦", lvl: 5, nextXp: 500 };
-  if (xp >= 300) return { title: "Reconstructor ⚒", lvl: 4, nextXp: 400 };
-  if (xp >= 200) return { title: "Investigador 🔍", lvl: 3, nextXp: 300 };
-  if (xp >= 100) return { title: "Explorador 🧭", lvl: 2, nextXp: 200 };
-  return { title: "Despierto 👁", lvl: 1, nextXp: 100 };
+  if (xp >= 600) return { title: "Mapa completo", lvl: 7, nextXp: 700 };
+  if (xp >= 500) return { title: "Discerniendo", lvl: 6, nextXp: 600 };
+  if (xp >= 400) return { title: "Conectando", lvl: 5, nextXp: 500 };
+  if (xp >= 300) return { title: "Profundizando", lvl: 4, nextXp: 400 };
+  if (xp >= 200) return { title: "Descubriendo patrones", lvl: 3, nextXp: 300 };
+  if (xp >= 100) return { title: "Observando", lvl: 2, nextXp: 200 };
+  return { title: "Primera mirada", lvl: 1, nextXp: 100 };
 };
+
+const USE_GUIDED_FLOW = true;
 
 export default function App() {
   const [step, setStep] = useState<Step>(() => {
@@ -476,10 +485,10 @@ export default function App() {
       'primer-paso': true
     }));
     
-    setXpNotification({ xp: 25, label: "¡Ficha de Explorador Preparada!" });
+    setXpNotification({ xp: 25, label: "Perfil de exploración listo" });
     setNewAchievementAlert({ 
-      name: "Primer Paso ⚔️", 
-      description: "Has iniciado tu Expedición al Territorio Interior con valentía." 
+      name: "PRIMERA MIRADA", 
+      description: "Has comenzado tu exploración." 
     });
 
     setTimeout(() => {
@@ -494,7 +503,7 @@ export default function App() {
   };
 
   const handleMapRegionAnswer = (regionId: string, score: number) => {
-    if (isAnswering) return; // Prevent double taps
+    const alreadyAnswered = screeningAnswers[regionId] !== undefined;
 
     setScreeningAnswers(prev => {
       const updated = {
@@ -502,8 +511,7 @@ export default function App() {
         [regionId]: score
       };
 
-      // Award XP for first discovery of this region
-      const alreadyAnswered = prev[regionId] !== undefined;
+      // Award XP for first discovery of this region (only if not already answered)
       if (!alreadyAnswered) {
         setUserXp(currentXp => currentXp + 30);
         setXpNotification({ 
@@ -515,13 +523,14 @@ export default function App() {
 
       // Check for mid-journey Milestone achievement (4 regions completed)
       const completedCount = Object.keys(updated).length;
-      if (completedCount === 4) {
+      if (completedCount === 4 && !alreadyAnswered) {
         setAchievements(ach => {
+          if (ach['explorador-valiente']) return ach;
           const upd = { ...ach, 'explorador-valiente': true };
           localStorage.setItem('ti_achievements', JSON.stringify(upd));
           setNewAchievementAlert({ 
-            name: "Explorador Valiente 🗺️", 
-            description: "Has trazado con éxito la mitad de tu Territorio Interior." 
+            name: "MITAD DEL CAMINO", 
+            description: "Has explorado 4 de las 9 áreas." 
           });
           setTimeout(() => setNewAchievementAlert(null), 4500);
           return upd;
@@ -534,10 +543,6 @@ export default function App() {
 
     // Generate clinical-pastoral feedback
     const feedback = getPastoralConversationalFeedback(regionId, score, userName);
-    setAnsweringFeedback(feedback);
-    setIsAnswering(true);
-
-    const transitionDelay = 2200;
 
     // Check if ALL 9 regions are fully completed
     const keys = Object.keys(bloquesDiagnostico);
@@ -548,40 +553,50 @@ export default function App() {
     const allCompleted = keys.every(k => answeredKeys.includes(k));
 
     if (allCompleted) {
-      // Award Final Regional Conquest Medal & bonus XP
+      // Award Final Regional Conquest Medal & bonus XP if not already awarded
       setAchievements(ach => {
-        const upd = { ...ach, 'rompedor-de-cadenas': true };
-        localStorage.setItem('ti_achievements', JSON.stringify(upd));
-        return upd;
-      });
-      setUserXp(xp => xp + 50);
-
-      setTimeout(() => {
-        setAnsweringFeedback("¡Excelente! Has completado la exploración de las 9 áreas. Analizando patrones con discernimiento...");
-        setXpNotification({ xp: 50, label: "¡Mapeo Inicial Completado!" });
-        setNewAchievementAlert({ 
-          name: "Paso de Valentía ✨", 
-          description: "Completaste las 9 áreas para conocer la verdad que trae libertad." 
-        });
-        setTimeout(() => setXpNotification(null), 3000);
-        setTimeout(() => setNewAchievementAlert(null), 4500);
-      }, transitionDelay);
-
-      setTimeout(() => {
-        setStep('calculating_blocks');
-        setIsAnswering(false);
-        setAnsweringFeedback('');
-      }, transitionDelay + 2500);
-    } else {
-      setTimeout(() => {
-        // Find next uncompleted region key
-        const nextUncompleted = keys.find(k => k !== regionId && !answeredKeys.includes(k));
-        if (nextUncompleted) {
-          setCurrentSelectedRegion(nextUncompleted);
+        if (!ach['rompedor-de-cadenas']) {
+          const upd = { ...ach, 'rompedor-de-cadenas': true };
+          localStorage.setItem('ti_achievements', JSON.stringify(upd));
+          setUserXp(xp => xp + 50);
+          setXpNotification({ xp: 50, label: "Panorama completo" });
+          setNewAchievementAlert({ 
+            name: "PANORAMA COMPLETO", 
+            description: "Has explorado las 9 áreas de tu vida." 
+          });
+          setTimeout(() => setXpNotification(null), 3000);
+          setTimeout(() => setNewAchievementAlert(null), 4500);
+          return upd;
         }
-        setIsAnswering(false);
-        setAnsweringFeedback('');
-      }, transitionDelay);
+        return ach;
+      });
+
+      const finalMsg = "¡Excelente! Has completado la exploración de las 9 áreas. Analizando patrones con discernimiento...";
+      setAnsweringFeedback(`${feedback}\n\n${finalMsg}`);
+      setIsAnswering(true);
+    } else {
+      setAnsweringFeedback(feedback);
+      setIsAnswering(true);
+    }
+  };
+
+  const handleContinueScreening = () => {
+    const keys = Object.keys(bloquesDiagnostico);
+    const answeredKeys = Object.keys(screeningAnswers);
+    const allCompleted = keys.every(k => answeredKeys.includes(k));
+
+    if (allCompleted) {
+      setStep('calculating_blocks');
+      setIsAnswering(false);
+      setAnsweringFeedback('');
+    } else {
+      // Find next uncompleted region key
+      const nextUncompleted = keys.find(k => k !== currentSelectedRegion && !answeredKeys.includes(k));
+      if (nextUncompleted) {
+        setCurrentSelectedRegion(nextUncompleted);
+      }
+      setIsAnswering(false);
+      setAnsweringFeedback('');
     }
   };
 
@@ -618,65 +633,97 @@ export default function App() {
         setDeepDiveAnswers(initialAnswers);
         
         setStep('deep_dive');
-      }, 2500);
+      }, 1200);
       return () => clearTimeout(timer);
     }
   }, [step, screeningAnswers, screeningList]);
 
   const handleDeepDiveAnswer = (score: number) => {
-    if (isAnswering) return; // Prevent double taps
-
     const currentQuestion = deepDiveQuestions[deepDiveIndex];
+    if (!currentQuestion) return;
+
+    // Only award XP if not already answering this question (allows changing response without duplicating XP)
+    const isFirstSelectionForThisQuestion = !isAnswering;
+
     setDeepDiveAnswers(prev => ({
       ...prev,
       [currentQuestion.id]: score
     }));
 
-    // Award XP (15 XP for cataloging each deep belief node)
-    setUserXp(currentXp => currentXp + 15);
-    setXpNotification({ xp: 15, label: `Descifrando: ${currentQuestion.bloque}` });
-    setTimeout(() => setXpNotification(null), 3000);
+    if (isFirstSelectionForThisQuestion) {
+      // Award XP (15 XP for cataloging each deep belief node)
+      setUserXp(currentXp => currentXp + 15);
+      setXpNotification({ xp: 15, label: `Explorando: ${currentQuestion.bloque}` });
+      setTimeout(() => setXpNotification(null), 3000);
+    }
 
     // Generate warm deep-dive feedback
     const feedback = getDeepDivePastoralFeedback(currentQuestion.bloque, score, userName);
-    setAnsweringFeedback(feedback);
-    setIsAnswering(true);
 
-    const transitionDelay = 2200; // 2.2 seconds to absorb the pastoral translation
+    const isLastQuestion = deepDiveIndex === deepDiveQuestions.length - 1;
 
-    if (deepDiveIndex < deepDiveQuestions.length - 1) {
-      setTimeout(() => {
-        setDeepDiveIndex(prev => prev + 1);
-        setIsAnswering(false);
-        setAnsweringFeedback('');
-      }, transitionDelay);
-    } else {
-      // Award Descent Completion Achievement
+    if (isLastQuestion) {
+      // Award Descent Completion Achievement if not already awarded
       setAchievements(ach => {
-        const upd = { ...ach, 'ojo-revelador': true };
-        localStorage.setItem('ti_achievements', JSON.stringify(upd));
-        return upd;
+        if (!ach['ojo-revelador']) {
+          const upd = { ...ach, 'ojo-revelador': true };
+          localStorage.setItem('ti_achievements', JSON.stringify(upd));
+          setUserXp(currentXp => currentXp + 60);
+          setXpNotification({ xp: 60, label: "Exploración profunda completada" });
+          setNewAchievementAlert({ 
+            name: "MÁS PROFUNDO", 
+            description: "Has examinado los pensamientos detrás de tus respuestas." 
+          });
+          setTimeout(() => setXpNotification(null), 3000);
+          setTimeout(() => setNewAchievementAlert(null), 4500);
+          return upd;
+        }
+        return ach;
       });
-      setUserXp(currentXp => currentXp + 60);
 
-      setTimeout(() => {
-        setAnsweringFeedback("¡Autoexploración completada! Llevando cada pensamiento a la luz de la verdad en Cristo. Preparando tu diagnóstico...");
-        setXpNotification({ xp: 60, label: "¡Exploración Concluida!" });
-        setNewAchievementAlert({ 
-          name: "Claridad Interior 🕊️", 
-          description: "Has examinado tus pensamientos a la luz de la verdad que renueva la mente." 
-        });
-        setTimeout(() => setXpNotification(null), 3000);
-        setTimeout(() => setNewAchievementAlert(null), 4500);
-      }, transitionDelay);
-
-      setTimeout(() => {
-        setStep('generating_results');
-        setIsAnswering(false);
-        setAnsweringFeedback('');
-      }, transitionDelay + 2500);
+      const finalMsg = "¡Autoexploración completada! Llevando cada pensamiento a la luz de la verdad en Cristo. Preparando tu mapa de exploración...";
+      setAnsweringFeedback(`${feedback}\n\n${finalMsg}`);
+      setIsAnswering(true);
+    } else {
+      setAnsweringFeedback(feedback);
+      setIsAnswering(true);
     }
   };
+
+  const handleContinueDeepDive = () => {
+    if (deepDiveIndex < deepDiveQuestions.length - 1) {
+      setDeepDiveIndex(prev => prev + 1);
+      setIsAnswering(false);
+      setAnsweringFeedback('');
+    } else {
+      setStep('generating_results');
+      setIsAnswering(false);
+      setAnsweringFeedback('');
+    }
+  };
+
+  // Keyboard navigation: Enter key triggers CONTINUAR when button is visible
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Enter') {
+        const target = e.target as HTMLElement | null;
+        if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) {
+          return;
+        }
+
+        if (step === 'screening' && isAnswering && answeringFeedback) {
+          e.preventDefault();
+          handleContinueScreening();
+        } else if (step === 'deep_dive' && isAnswering && answeringFeedback) {
+          e.preventDefault();
+          handleContinueDeepDive();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [step, isAnswering, answeringFeedback, screeningAnswers, currentSelectedRegion, deepDiveIndex, deepDiveQuestions]);
 
   const restartJourney = () => {
     setStep('welcome');
@@ -705,6 +752,8 @@ export default function App() {
     setUserXp(0);
     setAchievements({});
     setCurrentSelectedRegion('capacidad-identidad');
+    setIsAnswering(false);
+    setAnsweringFeedback('');
     
     localStorage.removeItem('ti_step');
     localStorage.removeItem('ti_screening_answers');
@@ -969,6 +1018,45 @@ export default function App() {
     return detectBlockInteractions(screeningAnswers);
   }, [screeningAnswers, aiDiagnosis]);
 
+  // Nivel de confianza calculado para cada interacción según los 6 factores metodológicos
+  const interactionConfidence = useMemo(() => {
+    const map: Record<string, ConfidenceEvaluation> = {};
+    detectedInteractions.forEach((inter) => {
+      const evaluation = evaluateHypothesisConfidence({
+        hipotesisTitulo: inter.tag,
+        hipotesisDescripcion: inter.hipotesis,
+        bloqueId: inter.blockA.id,
+        screeningScores: screeningAnswers,
+        isUserValidated: false
+      });
+
+      let nivel: ConfidenceLevel = evaluation.nivel;
+
+      // Para señales: antes de aplicar la validación, nivel inicial es BAJA si devolvió MODERADA o ALTA
+      if (inter.nivel === 'senal' && (nivel === 'MODERADA' || nivel === 'ALTA')) {
+        nivel = 'BAJA';
+      }
+
+      // Regla de validación: si está validada, sube UN escalón (sin pasar de ALTA)
+      if (validatedInteractions[inter.id]) {
+        if (nivel === 'INSUFICIENTE') nivel = 'BAJA';
+        else if (nivel === 'BAJA') nivel = 'MODERADA';
+        else if (nivel === 'MODERADA') nivel = 'ALTA';
+      }
+
+      // Tope por nivel de interacción: si es 'senal', el nivel máximo es MODERADA
+      if (inter.nivel === 'senal' && nivel === 'ALTA') {
+        nivel = 'MODERADA';
+      }
+
+      map[inter.id] = {
+        ...evaluation,
+        nivel
+      };
+    });
+    return map;
+  }, [detectedInteractions, screeningAnswers, validatedInteractions]);
+
   // Healthiest / freest areas (score <= 2 or the lowest 3)
   const healthiestBlocks = useMemo(() => {
     const low = sortedBlocksWithScores.filter(b => b.score <= 2);
@@ -990,7 +1078,11 @@ export default function App() {
 
   // PDF Devotional exporter
   const handleExportPDF = () => {
-    downloadPDFResults(userName, userEmail, aiDiagnosis, results, journalNotes);
+    const levelsMap: Record<string, string> = {};
+    Object.entries(interactionConfidence).forEach(([id, conf]) => {
+      levelsMap[id] = (conf as ConfidenceEvaluation).nivel;
+    });
+    downloadPDFResults(userName, userEmail, aiDiagnosis, results, journalNotes, levelsMap);
   };
 
   return (
@@ -1030,10 +1122,10 @@ export default function App() {
                 <div className="flex justify-between text-xs text-white/40 mb-2 font-mono">
                   <span>Rastreo Integral</span>
                   <span>
-                    {step === 'screening' && ` Screening: ${screeningIndex + 1} / 9`}
+                    {step === 'screening' && ` Screening: ${Object.keys(screeningAnswers).length} / 9`}
                     {step === 'calculating_blocks' && `Calculando activación`}
                     {step === 'deep_dive' && `Profundización: ${deepDiveIndex + 1} / ${deepDiveQuestions.length}`}
-                    {step === 'results' && 'Tu Diagnóstico'}
+                    {step === 'results' && 'Tu mapa de exploración'}
                   </span>
                 </div>
                 <div id="progress-track" className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden">
@@ -1042,7 +1134,7 @@ export default function App() {
                     initial={{ width: 0 }}
                     animate={{ 
                       width: `${
-                        step === 'screening' ? ((screeningIndex + 1) / 9) * 100 :
+                        step === 'screening' ? (Object.keys(screeningAnswers).length / 9) * 100 :
                         step === 'calculating_blocks' ? 50 :
                         step === 'deep_dive' ? (50 + ((deepDiveIndex + 1) / deepDiveQuestions.length) * 50) :
                         step === 'generating_results' ? 95 : 100
@@ -1291,13 +1383,13 @@ export default function App() {
                             <p className="text-[10px] text-white/50">{userAge ? `${userAge} años` : 'Edad no definida'} • Misión: {userGoal ? userGoal : 'Encontrar la verdad'}</p>
                           </div>
                           <div className="text-right">
-                            <span className="text-[10px] font-bold bg-[#C9A84C]/10 text-[#C9A84C] border border-[#C9A84C]/20 px-2 py-0.5 rounded-full font-mono">Lvl 1: Despierto 👁</span>
+                            <span className="text-[10px] font-bold bg-[#C9A84C]/10 text-[#C9A84C] border border-[#C9A84C]/20 px-2 py-0.5 rounded-full font-mono">Nivel 1: Primera mirada</span>
                           </div>
                         </div>
                         <div className="w-full bg-white/5 h-1 rounded-full overflow-hidden mt-1">
                           <div className="bg-[#C9A84C] h-full w-[25%]" />
                         </div>
-                        <p className="text-[9px] text-white/30 italic">✓ +25 XP iniciales serán otorgados al iniciar la exploración.</p>
+                        <p className="text-[9px] text-white/30 italic">✓ +25 puntos iniciales serán otorgados al iniciar la exploración.</p>
                       </div>
 
                       {/* Terms Acceptance */}
@@ -1340,7 +1432,7 @@ export default function App() {
                       <div className="grid grid-cols-2 gap-3 pt-3.5 border-t border-white/5">
                         <div className="flex items-center gap-2 text-white/70">
                           <Clock className="w-4 h-4 text-[#C9A84C] flex-shrink-0" />
-                          <span className="text-[11px] leading-tight font-medium">⏱ Duración: 6 minutos</span>
+                          <span className="text-[11px] leading-tight font-medium">⏱ Duración: 8 a 12 minutos</span>
                         </div>
                         <div className="flex items-center gap-2 text-white/70">
                           <Activity className="w-4 h-4 text-[#C9A84C] flex-shrink-0" />
@@ -1369,9 +1461,27 @@ export default function App() {
 
             {/* STEP 2: SCREENING (CAPA 1) - LA EXPEDICIÓN DEL TERRITORIO INTERIOR */}
             {step === 'screening' && (
-              <motion.div
-                key="screening-pane"
-                initial={{ opacity: 0, scale: 0.98 }}
+              USE_GUIDED_FLOW ? (
+                <GuidedExplorationFlow
+                  bloquesDiagnostico={bloquesDiagnostico}
+                  currentSelectedRegion={currentSelectedRegion}
+                  screeningAnswers={screeningAnswers}
+                  isAnswering={isAnswering}
+                  answeringFeedback={answeringFeedback}
+                  userXp={userXp}
+                  getExploradorLevel={getExploradorLevel}
+                  onAnswer={handleMapRegionAnswer}
+                  onContinue={handleContinueScreening}
+                  onSelectRegion={(id) => {
+                    setCurrentSelectedRegion(id);
+                    setIsAnswering(false);
+                    setAnsweringFeedback('');
+                  }}
+                />
+              ) : (
+                <motion.div
+                  key="screening-pane"
+                  initial={{ opacity: 0, scale: 0.98 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.98 }}
                 className="space-y-6 max-w-6xl mx-auto"
@@ -1384,7 +1494,7 @@ export default function App() {
                       {getExploradorLevel(userXp).lvl}
                     </div>
                     <div>
-                      <h4 className="text-white text-[10px] font-mono uppercase tracking-[0.2em] font-bold">Rango de Exploración</h4>
+                      <h4 className="text-white text-[10px] font-mono uppercase tracking-[0.2em] font-bold">Etapa de exploración</h4>
                       <p className="text-[#C9A84C] font-semibold text-sm font-sans flex items-center gap-1.5">{getExploradorLevel(userXp).title}</p>
                     </div>
                   </div>
@@ -1392,7 +1502,7 @@ export default function App() {
                   {/* XP Progress Bar */}
                   <div className="w-full sm:w-64 space-y-1">
                     <div className="flex justify-between text-[10px] font-mono text-white/40 font-bold">
-                      <span>XP: {userXp} / {getExploradorLevel(userXp).nextXp}</span>
+                      <span>{userXp} / {getExploradorLevel(userXp).nextXp} puntos</span>
                       <span>Explorado: {Object.keys(screeningAnswers).length}/9 regiones</span>
                     </div>
                     <div className="w-full bg-white/5 h-2 rounded-full overflow-hidden border border-white/5">
@@ -1444,9 +1554,9 @@ export default function App() {
                           <div 
                             key={reg.id}
                             onClick={() => {
-                              if (!isAnswering) {
-                                setCurrentSelectedRegion(reg.id);
-                              }
+                              setCurrentSelectedRegion(reg.id);
+                              setIsAnswering(false);
+                              setAnsweringFeedback('');
                             }}
                             className={`p-3 rounded-2xl border text-left transition-all relative overflow-hidden group cursor-pointer flex flex-col justify-between min-h-[110px] ${
                               isSelected 
@@ -1556,77 +1666,72 @@ export default function App() {
 
                     {/* Likert Selection */}
                     <div className="space-y-4">
-                      <AnimatePresence mode="wait">
-                        {!isAnswering ? (
-                          <motion.div 
-                            key="likert-controls"
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -10 }}
-                            className="space-y-2.5"
-                          >
-                            <span className="text-[10px] font-mono uppercase tracking-widest text-white/30 block ml-1 font-bold">Graduación del Desafío</span>
-                            <div className="grid grid-cols-5 gap-2">
-                              {[
-                                { val: 1, desc: 'Nunca' },
-                                { val: 2, desc: 'Rara vez' },
-                                { val: 3, desc: 'A veces' },
-                                { val: 4, desc: 'A menudo' },
-                                { val: 5, desc: 'Total' }
-                              ].map((opt) => {
-                                const currentScore = screeningAnswers[currentSelectedRegion];
-                                const isSelectedOption = currentScore === opt.val;
-                                
-                                return (
-                                  <button
-                                    key={opt.val}
-                                    id={`likert-btn-${opt.val}`}
-                                    onClick={() => handleMapRegionAnswer(currentSelectedRegion, opt.val)}
-                                    className={`py-3 px-1 rounded-xl text-center group transition-all duration-200 cursor-pointer border ${
-                                      isSelectedOption
-                                        ? 'bg-[#C9A84C] text-[#0A0A0A] border-[#C9A84C] font-bold shadow-[0_0_10px_rgba(201,168,76,0.25)] scale-[1.03]'
-                                        : 'bg-[#1C1C1C] border-white/5 hover:border-[#C9A84C]/35 hover:bg-[#C9A84C]/5 text-white'
-                                    }`}
-                                  >
-                                    <span className={`block text-sm font-bold leading-none mb-1 ${
-                                      isSelectedOption ? 'text-[#0A0A0A]' : 'text-white/40 group-hover:text-[#C9A84C]'
-                                    }`}>{opt.val}</span>
-                                    <span className="block text-[8px] font-bold tracking-tight uppercase leading-none opacity-80">{opt.desc}</span>
-                                  </button>
-                                );
-                              })}
-                            </div>
-                            <div className="flex justify-between items-center text-[10px] font-mono text-white/30 px-1 mt-1">
-                              <span>← No resuena</span>
-                              <span>Resuena de lleno →</span>
-                            </div>
-                          </motion.div>
-                        ) : (
+                      <div className="space-y-2.5">
+                        <span className="text-[10px] font-mono uppercase tracking-widest text-white/30 block ml-1 font-bold">¿Cuánto resuena contigo?</span>
+                        <div className="grid grid-cols-5 gap-2">
+                          {[
+                            { val: 1, desc: 'Nunca' },
+                            { val: 2, desc: 'Rara vez' },
+                            { val: 3, desc: 'A veces' },
+                            { val: 4, desc: 'A menudo' },
+                            { val: 5, desc: 'Total' }
+                          ].map((opt) => {
+                            const currentScore = screeningAnswers[currentSelectedRegion];
+                            const isSelectedOption = currentScore === opt.val;
+                            
+                            return (
+                              <button
+                                key={opt.val}
+                                id={`likert-btn-${opt.val}`}
+                                type="button"
+                                onClick={() => handleMapRegionAnswer(currentSelectedRegion, opt.val)}
+                                className={`py-3 px-1 rounded-xl text-center group transition-all duration-200 cursor-pointer border ${
+                                  isSelectedOption
+                                    ? 'bg-[#C9A84C] text-[#0A0A0A] border-[#C9A84C] font-bold shadow-[0_0_10px_rgba(201,168,76,0.25)] scale-[1.03]'
+                                    : 'bg-[#1C1C1C] border-white/5 hover:border-[#C9A84C]/35 hover:bg-[#C9A84C]/5 text-white'
+                                }`}
+                              >
+                                <span className={`block text-sm font-bold leading-none mb-1 ${
+                                  isSelectedOption ? 'text-[#0A0A0A]' : 'text-white/40 group-hover:text-[#C9A84C]'
+                                }`}>{opt.val}</span>
+                                <span className="block text-[8px] font-bold tracking-tight uppercase leading-none opacity-80">{opt.desc}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <div className="flex justify-between items-center text-[10px] font-mono text-white/30 px-1 mt-1">
+                          <span>← No resuena</span>
+                          <span>Resuena de lleno →</span>
+                        </div>
+                      </div>
+
+                      <AnimatePresence>
+                        {isAnswering && answeringFeedback && (
                           <motion.div
-                            key="counseling-feedback"
-                            initial={{ opacity: 0, scale: 0.95 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.95 }}
-                            className="bg-[#1C1C1C]/90 border border-[#C9A84C]/35 p-5 rounded-2xl flex flex-col items-center justify-center gap-3 text-center relative overflow-hidden shadow-2xl min-h-[140px]"
+                            key="counseling-feedback-box"
+                            initial={{ opacity: 0, y: 8 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -8 }}
+                            transition={{ duration: 0.35, ease: "easeOut" }}
+                            className="space-y-3"
                           >
-                            {/* Dynamic Progress Bar */}
-                            <div 
-                              className="absolute inset-x-0 bottom-0 h-1 bg-gradient-to-r from-gradient to-yellow-600"
-                              style={{
-                                width: barWidth,
-                                transition: 'width 2.15s linear',
-                                background: '#C9A84C'
-                              }}
-                            />
-                            <div className="w-10 h-10 rounded-full bg-[#C9A84C]/10 border border-[#C9A84C]/25 flex items-center justify-center text-[#C9A84C]">
-                              <Sparkles className="w-5 h-5 text-[#C9A84C] animate-pulse" />
+                            <div className="bg-[#1C1C1C]/90 border border-[#C9A84C]/35 p-4 rounded-2xl flex flex-col items-center justify-center gap-2.5 text-center relative overflow-hidden shadow-2xl">
+                              <div className="w-8 h-8 rounded-full bg-[#C9A84C]/10 border border-[#C9A84C]/25 flex items-center justify-center text-[#C9A84C]">
+                                <Sparkles className="w-4 h-4 text-[#C9A84C] animate-pulse" />
+                              </div>
+                              <p className="text-xs sm:text-sm text-white italic leading-relaxed px-1 whitespace-pre-line">
+                                "{answeringFeedback}"
+                              </p>
                             </div>
-                            <p className="text-xs sm:text-sm text-white italic leading-relaxed px-1">
-                              "{answeringFeedback}"
-                            </p>
-                            <span className="text-[10px] text-white/40 font-mono flex items-center gap-1">
-                              <Clock className="w-3" /> Mapeando vibraciones de la creencia...
-                            </span>
+
+                            <button
+                              type="button"
+                              id="screening-btn-continue"
+                              onClick={handleContinueScreening}
+                              className="w-full bg-gradient-to-r from-[#C9A84C] to-yellow-600 hover:from-[#d8b556] hover:to-yellow-500 text-[#0D0D0D] font-bold py-3.5 px-5 rounded-xl transition-all shadow-[0_0_15px_rgba(201,168,76,0.25)] flex items-center justify-center gap-2 cursor-pointer text-xs sm:text-sm uppercase tracking-wider font-mono hover:scale-[1.01] active:scale-95"
+                            >
+                              <span>CONTINUAR →</span>
+                            </button>
                           </motion.div>
                         )}
                       </AnimatePresence>
@@ -1638,6 +1743,8 @@ export default function App() {
                         onClick={() => {
                           const keys = Object.keys(bloquesDiagnostico);
                           const currentIndex = keys.indexOf(currentSelectedRegion);
+                          setIsAnswering(false);
+                          setAnsweringFeedback('');
                           if (currentIndex > 0) {
                             setCurrentSelectedRegion(keys[currentIndex - 1]);
                           } else {
@@ -1657,6 +1764,7 @@ export default function App() {
                   </div>
                 </div>
               </motion.div>
+              )
             )}
 
             {/* STEP 3: INTERMEDIATE CALCULATING PROGRESS */}
@@ -1746,72 +1854,75 @@ export default function App() {
                     </div>
 
                     {/* Highly Stylized Heart Dial responses */}
-                    <div className="bg-[#121212] border border-white/5 p-6 rounded-3xl space-y-3 shadow-xl">
+                    <div className="bg-[#121212] border border-white/5 p-6 rounded-3xl space-y-4 shadow-xl">
                       <span className="text-[10px] font-mono uppercase tracking-widest text-white/35 block ml-1 font-bold">Graduación en tu Espíritu</span>
-                      <AnimatePresence mode="wait">
-                        {!isAnswering ? (
-                          <motion.div 
-                            key="deep-dive-selection"
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -10 }}
-                            className="grid grid-cols-1 sm:grid-cols-3 gap-3"
-                          >
-                            <button
-                              key="dive-yes"
-                              id="deep-dive-yes"
-                              onClick={() => handleDeepDiveAnswer(2)}
-                              className="bg-[#C9A84C] hover:bg-[#C9A84C]/95 text-black font-bold p-4 rounded-xl text-center hover:scale-[1.01] active:scale-95 transition-all cursor-pointer shadow-lg shadow-[#C9A84C]/10 flex flex-col justify-center items-center min-h-[70px]"
-                            >
-                              <span className="text-sm font-extrabold tracking-wide uppercase">Prácticamente Sí</span>
-                              <span className="text-[9px] opacity-75 font-normal block">Siento total y constante afinidad</span>
-                            </button>
+                      
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        {[
+                          { score: 2, id: 'deep-dive-yes', title: 'Prácticamente Sí', desc: 'Siento total y constante afinidad' },
+                          { score: 1, id: 'deep-dive-sometimes', title: 'A veces', desc: 'Ocurre de manera intermitente' },
+                          { score: 0, id: 'deep-dive-no', title: 'En absoluto', desc: 'No coincide ni resuena conmigo' }
+                        ].map((opt) => {
+                          const currentScore = deepDiveAnswers[deepDiveQuestions[deepDiveIndex]?.id];
+                          const isSelected = isAnswering && currentScore === opt.score;
 
+                          return (
                             <button
-                              key="dive-sometimes"
-                              id="deep-dive-sometimes"
-                              onClick={() => handleDeepDiveAnswer(1)}
-                              className="bg-[#1C1C1C] border border-white/10 text-white hover:border-[#C9A84C]/50 font-bold p-4 rounded-xl text-center hover:scale-[1.01] active:scale-95 transition-all cursor-pointer flex flex-col justify-center items-center min-h-[70px]"
+                              key={opt.id}
+                              id={opt.id}
+                              type="button"
+                              onClick={() => handleDeepDiveAnswer(opt.score)}
+                              className={`p-4 rounded-xl text-center transition-all cursor-pointer flex flex-col justify-center items-center min-h-[70px] border ${
+                                isSelected
+                                  ? 'bg-[#C9A84C] text-[#0A0A0A] border-[#C9A84C] font-bold shadow-[0_0_15px_rgba(201,168,76,0.3)] scale-[1.02]'
+                                  : opt.score === 2
+                                  ? 'bg-[#C9A84C]/15 border-[#C9A84C]/35 text-[#C9A84C] hover:bg-[#C9A84C]/25'
+                                  : opt.score === 1
+                                  ? 'bg-[#1C1C1C] border-white/10 text-white hover:border-[#C9A84C]/50'
+                                  : 'bg-[#161616] border-white/5 text-white/60 hover:text-white hover:border-red-500/30'
+                              }`}
                             >
-                              <span className="text-sm font-extrabold tracking-wide uppercase">A veces</span>
-                              <span className="text-[9px] text-white/55 font-normal block font-sans">Ocurre de manera intermitente</span>
+                              <span className={`text-sm font-extrabold tracking-wide uppercase ${isSelected ? 'text-[#0A0A0A]' : ''}`}>
+                                {opt.title}
+                              </span>
+                              <span className={`text-[9px] block ${isSelected ? 'text-black/80 font-semibold' : 'text-white/50'}`}>
+                                {opt.desc}
+                              </span>
                             </button>
+                          );
+                        })}
+                      </div>
 
-                            <button
-                              key="dive-no"
-                              id="deep-dive-no"
-                              onClick={() => handleDeepDiveAnswer(0)}
-                              className="bg-[#161616] border border-white/5 text-white/60 hover:text-white hover:border-red-500/30 font-bold p-4 rounded-xl text-center hover:scale-[1.01] active:scale-95 transition-all cursor-pointer flex flex-col justify-center items-center min-h-[70px]"
-                            >
-                              <span className="text-sm font-extrabold tracking-wide uppercase">En absoluto</span>
-                              <span className="text-[9px] text-white/40 font-normal block">No coincide ni resuena conmigo</span>
-                            </button>
-                          </motion.div>
-                        ) : (
+                      <AnimatePresence>
+                        {isAnswering && answeringFeedback && (
                           <motion.div
-                            key="deep-dive-feedback"
-                            initial={{ opacity: 0, scale: 0.95 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.95 }}
-                            className="bg-[#1C1C1C]/95 border border-[#C9A84C]/35 p-5 rounded-2xl flex flex-col items-center justify-center gap-3 text-center relative overflow-hidden shadow-2xl min-h-[82px]"
+                            key="deep-dive-feedback-box"
+                            initial={{ opacity: 0, y: 8 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -8 }}
+                            transition={{ duration: 0.35, ease: "easeOut" }}
+                            className="space-y-3 pt-2"
                           >
-                            <div 
-                              className="absolute inset-x-0 bottom-0 h-1"
-                              style={{
-                                width: barWidth,
-                                transition: 'width 2.15s linear',
-                                background: '#C9A84C'
-                              }}
-                            />
-                            <div className="w-10 h-10 rounded-full bg-[#C9A84C]/10 border border-[#C9A84C]/25 flex items-center justify-center text-[#C9A84C]">
-                              <Activity className="w-5 h-5 text-[#C9A84C] animate-pulse" />
+                            <div className="bg-[#1C1C1C]/95 border border-[#C9A84C]/35 p-4 rounded-2xl flex flex-col items-center justify-center gap-2.5 text-center relative overflow-hidden shadow-2xl">
+                              <div className="w-8 h-8 rounded-full bg-[#C9A84C]/10 border border-[#C9A84C]/25 flex items-center justify-center text-[#C9A84C]">
+                                <Activity className="w-4 h-4 text-[#C9A84C] animate-pulse" />
+                              </div>
+                              <p className="text-xs sm:text-sm text-white italic leading-relaxed px-2 font-sans whitespace-pre-line">
+                                "{answeringFeedback}"
+                              </p>
+                              <span className="text-[10px] text-[#C9A84C] font-mono flex items-center gap-1.5 animate-pulse uppercase tracking-wider font-semibold">
+                                <Sparkles className="w-3.5 h-3.5" /> Reconfigurando redes neuronales del espíritu...
+                              </span>
                             </div>
-                            <p className="text-xs sm:text-sm text-white italic leading-relaxed px-2 font-sans">
-                              "{answeringFeedback}"
-                            </p>
-                            <span className="text-[10px] text-[#C9A84C] font-mono flex items-center gap-1.5 animate-pulse uppercase tracking-wider font-semibold">
-                              <Sparkles className="w-3.5 h-3.5" /> Reconfigurando redes neuronales del espíritu...
-                            </span>
+
+                            <button
+                              type="button"
+                              id="deep-dive-btn-continue"
+                              onClick={handleContinueDeepDive}
+                              className="w-full bg-gradient-to-r from-[#C9A84C] to-yellow-600 hover:from-[#d8b556] hover:to-yellow-500 text-[#0D0D0D] font-bold py-3.5 px-5 rounded-xl transition-all shadow-[0_0_15px_rgba(201,168,76,0.25)] flex items-center justify-center gap-2 cursor-pointer text-xs sm:text-sm uppercase tracking-wider font-mono hover:scale-[1.01] active:scale-95"
+                            >
+                              <span>CONTINUAR →</span>
+                            </button>
                           </motion.div>
                         )}
                       </AnimatePresence>
@@ -1895,20 +2006,20 @@ export default function App() {
 
                     <div className="flex justify-between items-center border-t border-white/5 pt-4">
                       {/* Back Button */}
-                      {!isAnswering && (
-                        <button 
-                          onClick={() => {
-                            if (deepDiveIndex > 0) {
-                              setDeepDiveIndex(prev => prev - 1);
-                            } else {
-                              setStep('screening');
-                            }
-                          }}
-                          className="flex items-center gap-1 text-white/45 hover:text-white text-xs transition-colors cursor-pointer font-bold font-mono"
-                        >
-                          <ArrowLeft className="w-3.5 h-3.5" /> Atrás
-                        </button>
-                      )}
+                      <button 
+                        onClick={() => {
+                          setIsAnswering(false);
+                          setAnsweringFeedback('');
+                          if (deepDiveIndex > 0) {
+                            setDeepDiveIndex(prev => prev - 1);
+                          } else {
+                            setStep('screening');
+                          }
+                        }}
+                        className="flex items-center gap-1 text-white/45 hover:text-white text-xs transition-colors cursor-pointer font-bold font-mono"
+                      >
+                        <ArrowLeft className="w-3.5 h-3.5" /> Atrás
+                      </button>
                       
                       <span className="text-[9px] font-mono text-white/20 uppercase font-bold">
                         Capa 2 • Expedición Interior
@@ -2766,6 +2877,9 @@ export default function App() {
                               .map((inter, idx) => {
                                 const isValidated = validatedInteractions[inter.id];
                                 const isSignal = inter.nivel === 'senal';
+                                const confEvaluation = interactionConfidence[inter.id];
+                                const confLevel = confEvaluation?.nivel || 'MODERADA';
+                                const confBadge = getConfidenceBadgeProps(confLevel);
                                 return (
                                   <div
                                     key={inter.id || idx}
@@ -2792,6 +2906,10 @@ export default function App() {
                                             Señal débil — a explorar
                                           </span>
                                         )}
+                                        <span className={`px-2.5 py-0.5 rounded-full border text-[10px] font-mono font-bold uppercase tracking-wider inline-flex items-center gap-1.5 ${confBadge.badgeBg}`}>
+                                          <span className={`w-1.5 h-1.5 rounded-full ${confBadge.dotColor}`} />
+                                          {confBadge.label}
+                                        </span>
                                       </div>
 
                                       <span className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[10px] font-mono uppercase tracking-wider text-white/70 font-semibold">
@@ -3084,12 +3202,37 @@ export default function App() {
                               <span className="text-[10px] text-[#C9A84C] uppercase tracking-wider font-mono font-bold">
                                 Hipótesis de Creencia a Contrastar
                               </span>
-                              <p className="text-white text-base font-semibold leading-relaxed mt-1">
-                                {displayBelief}
-                              </p>
-                              <span className="text-[10px] text-white/40 font-mono block mt-1">
-                                Bloque asociado: {primaryBlock.title} ({primaryBlock.score}/5)
-                              </span>
+                              {tiedHypotheses.length > 1 ? (
+                                <div className="space-y-3 mt-2">
+                                  <p className="text-xs text-[#C9A84C] font-mono">
+                                    Estas áreas resonaron con la misma intensidad; conviene explorar ambas.
+                                  </p>
+                                  <div className="space-y-2">
+                                    {tiedHypotheses.map((h, idx) => {
+                                      const blockName = bloquesDiagnostico[h.bloqueId]?.title || h.bloque;
+                                      return (
+                                        <div key={idx} className="bg-black/30 border border-white/5 p-3 rounded-xl">
+                                          <p className="text-white text-sm font-semibold leading-relaxed">
+                                            «{h.afirmacionTest || h.creencia}»
+                                          </p>
+                                          <span className="text-[10px] text-white/40 font-mono block mt-1">
+                                            Bloque: {blockName}
+                                          </span>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              ) : (
+                                <>
+                                  <p className="text-white text-base font-semibold leading-relaxed mt-1">
+                                    {displayBelief}
+                                  </p>
+                                  <span className="text-[10px] text-white/40 font-mono block mt-1">
+                                    Bloque asociado: {primaryBlock.title} ({primaryBlock.score}/5)
+                                  </span>
+                                </>
+                              )}
                             </div>
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-white/5 pt-3">
