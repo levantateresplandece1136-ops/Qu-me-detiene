@@ -915,19 +915,19 @@ export const PRINCIPIO_FUNDAMENTAL_SISTEMA = {
       numero: 1,
       deDondePartimos: '¿Qué diagnóstico tiene esta persona?',
       etiqueta: 'Enfoque en etiquetas o rotulaciones estáticas (lo que dejamos atrás)',
-      descripcion: 'Intento de clasificar a la persona en un rótulo clínico o psicológico reduccionista.'
+      descripcion: 'Intentar clasificar a la persona con una etiqueta.'
     },
     etapa2: {
       numero: 2,
       haciaDondeAvanzamos: '¿Qué está pasando en esta persona y cómo puedo ayudarla bíblicamente?',
       etiqueta: 'Comprensión bíblica activa del corazón, circunstancias y verdad divina',
-      descripcion: 'Mapeo de la interpretación subjetiva, deseos, temores y la necesidad de redención en Cristo.'
+      descripcion: 'Entender lo que la persona piensa, desea y teme, a la luz de la Biblia.'
     },
     etapa3: {
       numero: 3,
       metaFinal: '¿Cómo puede esta persona aprender a responder con fe y fidelidad a Dios en sus circunstancias concretas?',
       etiqueta: 'Fruto pastoral, dependencia de la gracia y obediencia cotidiana',
-      descripcion: 'Crecimiento práctico fundamentado en la suficiencia de Cristo para honrar a Dios en lo cotidiano.'
+      descripcion: 'Aprender a responder con fe y fidelidad a Dios en la vida diaria.'
     }
   }
 };

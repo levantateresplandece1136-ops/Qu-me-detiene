@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   ArrowRight, 
@@ -44,6 +44,7 @@ import GoldenCelebration from './components/GoldenCelebration';
 import { HeartExplorationSection } from './components/HeartExplorationSection';
 import { SIMULATED_CASE_19 } from './data/counselingMovements';
 import GuidedExplorationFlow from './components/GuidedExplorationFlow';
+import { HEART_STAGE_QUESTIONS } from './data/heartStageQuestions';
 import { 
   evaluateHypothesisConfidence, 
   getConfidenceBadgeProps, 
@@ -58,7 +59,7 @@ export interface UserResult extends CreenciaRecord {
   score?: number;
 }
 
-type Step = 'welcome' | 'screening' | 'calculating_blocks' | 'deep_dive' | 'generating_results' | 'results';
+type Step = 'welcome' | 'screening' | 'calculating_blocks' | 'deep_dive' | 'heart_stages' | 'validation' | 'stage_transition' | 'generating_results' | 'results';
 
 // Evaluación pastoral para el monitoreo de renovación mental (Romanos 12:2)
 const getProgressEvaluation = (scores: Record<string, number>, name: string) => {
@@ -149,6 +150,7 @@ const getExploradorLevel = (xp: number) => {
 };
 
 const USE_GUIDED_FLOW = true;
+const SHOW_TEST_TOOLS = false;
 
 export default function App() {
   const [step, setStep] = useState<Step>(() => {
@@ -203,6 +205,65 @@ export default function App() {
     const saved = localStorage.getItem('ti_deep_dive_index');
     return saved ? parseInt(saved, 10) : 0;
   });
+
+  // Capa 3: Heart Stages Answers (stageId -> optionIds[]) & Stage Index
+  const [stageAnswers, setStageAnswers] = useState<Record<string, string[]>>(() => {
+    const saved = localStorage.getItem('ti_stage_answers');
+    return saved ? JSON.parse(saved) : {};
+  });
+  const [stageIndex, setStageIndex] = useState<number>(() => {
+    const saved = localStorage.getItem('ti_stage_index');
+    return saved ? parseInt(saved, 10) : 0;
+  });
+
+  // Capa 4: Validation (Etapa 07: Validación antes de los resultados)
+  const [rejectedInteractions, setRejectedInteractions] = useState<Record<string, boolean>>(() => {
+    const saved = localStorage.getItem('ti_rejected_interactions');
+    return saved ? JSON.parse(saved) : {};
+  });
+  const [validationIndex, setValidationIndex] = useState<number>(() => {
+    const saved = localStorage.getItem('ti_validation_index');
+    return saved ? parseInt(saved, 10) : 0;
+  });
+  const [validationAnswers, setValidationAnswers] = useState<Record<string, 'si' | 'parte' | 'no'>>(() => {
+    const saved = localStorage.getItem('ti_validation_answers');
+    return saved ? JSON.parse(saved) : {};
+  });
+  const scoredValidationIdsRef = useRef<Set<string>>(new Set());
+  // Fase 4B: patrón emergente durante el screening (solo cuando dos áreas llegan a >= 4)
+  const [emergingPattern, setEmergingPattern] = useState<string>('');
+  const shownPatternsRef = useRef<Set<string>>(new Set());
+  // Fase 4A: cierre de etapa con micro-insight (1 = tras screening, 2 = tras deep dive, 6 = tras etapa 06)
+  const [transitionFrom, setTransitionFrom] = useState<1 | 2 | 6 | null>(() => {
+    const saved = localStorage.getItem('ti_transition_from');
+    const n = saved ? parseInt(saved, 10) : NaN;
+    return n === 1 || n === 2 || n === 6 ? (n as 1 | 2 | 6) : null;
+  });
+
+  const stageSummary = useMemo(() => {
+    const summary: { busca: string[]; teme: string[]; protege: string[]; produce: string[] } = {
+      busca: [],
+      teme: [],
+      protege: [],
+      produce: []
+    };
+
+    HEART_STAGE_QUESTIONS.forEach(q => {
+      const selectedIds = stageAnswers[q.id] || [];
+      const labels = selectedIds
+        .map(id => q.options.find(opt => opt.id === id)?.label)
+        .filter((label): label is string => Boolean(label));
+      summary[q.id] = labels;
+    });
+
+    return summary;
+  }, [stageAnswers]);
+
+  // Track belief IDs scored in current journey to prevent duplicate XP on Back navigation
+  const scoredBeliefIdsRef = useRef<Set<number>>(new Set());
+
+  // Track stage IDs completed to prevent duplicate XP on Back navigation
+  const scoredStageIdsRef = useRef<Set<string>>(new Set());
 
   // Expandable sections in results
   const [expandedBelief, setExpandedBelief] = useState<number | null>(null);
@@ -260,11 +321,34 @@ export default function App() {
 
   const toggleValidatedInteraction = (id: string) => {
     setValidatedInteractions(prev => {
-      const next = { ...prev, [id]: !prev[id] };
+      const willBeValidated = !prev[id];
+      const next = { ...prev, [id]: willBeValidated };
       localStorage.setItem('ti_validated_interactions', JSON.stringify(next));
+
+      if (willBeValidated) {
+        setRejectedInteractions(rejPrev => {
+          if (!rejPrev[id]) return rejPrev;
+          const rejNext = { ...rejPrev, [id]: false };
+          localStorage.setItem('ti_rejected_interactions', JSON.stringify(rejNext));
+          return rejNext;
+        });
+      }
       return next;
     });
   };
+
+  // Interacciones dinámicas detectadas entre bloques (siempre calculadas localmente)
+  const detectedInteractions = useMemo(() => {
+    return detectBlockInteractions(screeningAnswers);
+  }, [screeningAnswers]);
+
+  // Preguntas de validación: hasta 2 interacciones de detectedInteractions, primero las de nivel 'patron' y luego las de nivel 'senal'
+  const validationTargets = useMemo<DetectedInteraction[]>(() => {
+    if (!detectedInteractions || detectedInteractions.length === 0) return [];
+    const patrones = detectedInteractions.filter(i => i.nivel === 'patron');
+    const senales = detectedInteractions.filter(i => i.nivel === 'senal');
+    return [...patrones, ...senales].slice(0, 2);
+  }, [detectedInteractions]);
 
   const [selectedBlockModalId, setSelectedBlockModalId] = useState<string | null>(null);
 
@@ -384,6 +468,16 @@ export default function App() {
     localStorage.setItem('ti_deep_dive_answers', JSON.stringify(deepDiveAnswers));
     localStorage.setItem('ti_deep_dive_questions', JSON.stringify(deepDiveQuestions));
     localStorage.setItem('ti_deep_dive_index', deepDiveIndex.toString());
+    localStorage.setItem('ti_stage_answers', JSON.stringify(stageAnswers));
+    localStorage.setItem('ti_stage_index', stageIndex.toString());
+    localStorage.setItem('ti_rejected_interactions', JSON.stringify(rejectedInteractions));
+    localStorage.setItem('ti_validation_index', validationIndex.toString());
+    if (transitionFrom) {
+      localStorage.setItem('ti_transition_from', transitionFrom.toString());
+    } else {
+      localStorage.removeItem('ti_transition_from');
+    }
+    localStorage.setItem('ti_validation_answers', JSON.stringify(validationAnswers));
     localStorage.setItem('ti_results', JSON.stringify(results));
     localStorage.setItem('ti_intro_paragraph', introParagraph);
     localStorage.setItem('ti_completed_days', JSON.stringify(completedDays));
@@ -413,6 +507,8 @@ export default function App() {
     deepDiveAnswers,
     deepDiveQuestions,
     deepDiveIndex,
+    stageAnswers,
+    stageIndex,
     results,
     introParagraph,
     completedDays,
@@ -427,7 +523,9 @@ export default function App() {
     userGoal,
     userXp,
     achievements,
-    currentSelectedRegion
+    currentSelectedRegion,
+    validationIndex,
+    transitionFrom
   ]);
 
   const screeningList = useMemo(() => {
@@ -440,7 +538,7 @@ export default function App() {
   // Sync scroll to top on step change
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, [step, screeningIndex, deepDiveIndex]);
+  }, [step, screeningIndex, deepDiveIndex, stageIndex]);
 
   // Load profile from localStorage if they exist
   useEffect(() => {
@@ -544,6 +642,20 @@ export default function App() {
     // Generate clinical-pastoral feedback
     const feedback = getPastoralConversationalFeedback(regionId, score, userName);
 
+    // Fase 4B: detectar un patrón emergente nuevo (ambas áreas >= 4) que involucre esta área
+    const nextScores = { ...screeningAnswers, [regionId]: score };
+    const newPattern = detectBlockInteractions(nextScores).find(i =>
+      i.nivel === 'patron' &&
+      (i.blockA.id === regionId || i.blockB.id === regionId) &&
+      !shownPatternsRef.current.has(i.id)
+    );
+    if (newPattern) {
+      shownPatternsRef.current.add(newPattern.id);
+      setEmergingPattern(`${newPattern.blockA.name} y ${newPattern.blockB.name} tienden a ir juntos en tus respuestas. Lo exploraremos más adelante.`);
+    } else {
+      setEmergingPattern('');
+    }
+
     // Check if ALL 9 regions are fully completed
     const keys = Object.keys(bloquesDiagnostico);
     const answeredKeys = Object.keys(screeningAnswers);
@@ -581,6 +693,7 @@ export default function App() {
   };
 
   const handleContinueScreening = () => {
+    setEmergingPattern('');
     const keys = Object.keys(bloquesDiagnostico);
     const answeredKeys = Object.keys(screeningAnswers);
     const allCompleted = keys.every(k => answeredKeys.includes(k));
@@ -604,13 +717,25 @@ export default function App() {
   useEffect(() => {
     if (step === 'calculating_blocks') {
       const timer = setTimeout(() => {
-        // Calculate all blocks with Score >= 3
-        let activated = Object.entries(screeningAnswers)
+        // Calculate all blocks with Score >= 3, sorted descending
+        const passing = Object.entries(screeningAnswers)
           .filter(([_, score]) => (score as number) >= 3)
-          .map(([id, _]) => id);
+          .sort((a, b) => (b[1] as number) - (a[1] as number));
 
-        // If no blocks are >= 3, pick the top 3 highest scores
-        if (activated.length === 0) {
+        let activated: string[] = [];
+
+        if (passing.length > 0) {
+          if (passing.length <= 3) {
+            activated = passing.map(([id]) => id);
+          } else {
+            // Keep top 3 plus any blocks that tie with the 3rd block's score
+            const cutoffScore = passing[2][1] as number;
+            activated = passing
+              .filter(([_, score]) => (score as number) >= cutoffScore)
+              .map(([id]) => id);
+          }
+        } else {
+          // If no blocks are >= 3, pick the top 3 highest scores
           const sorted = Object.entries(screeningAnswers)
             .sort((a, b) => (b[1] as number) - (a[1] as number))
             .slice(0, 3)
@@ -632,7 +757,8 @@ export default function App() {
         });
         setDeepDiveAnswers(initialAnswers);
         
-        setStep('deep_dive');
+        setTransitionFrom(1);
+        setStep('stage_transition');
       }, 1200);
       return () => clearTimeout(timer);
     }
@@ -642,15 +768,16 @@ export default function App() {
     const currentQuestion = deepDiveQuestions[deepDiveIndex];
     if (!currentQuestion) return;
 
-    // Only award XP if not already answering this question (allows changing response without duplicating XP)
-    const isFirstSelectionForThisQuestion = !isAnswering;
+    // Only award XP if this belief has not already been scored in this journey (prevents duplicate XP when navigating Back)
+    const isFirstTimeScored = !scoredBeliefIdsRef.current.has(currentQuestion.id);
 
     setDeepDiveAnswers(prev => ({
       ...prev,
       [currentQuestion.id]: score
     }));
 
-    if (isFirstSelectionForThisQuestion) {
+    if (isFirstTimeScored) {
+      scoredBeliefIdsRef.current.add(currentQuestion.id);
       // Award XP (15 XP for cataloging each deep belief node)
       setUserXp(currentXp => currentXp + 15);
       setXpNotification({ xp: 15, label: `Explorando: ${currentQuestion.bloque}` });
@@ -696,9 +823,216 @@ export default function App() {
       setIsAnswering(false);
       setAnsweringFeedback('');
     } else {
-      setStep('generating_results');
+      setTransitionFrom(2);
+      setStep('stage_transition');
       setIsAnswering(false);
       setAnsweringFeedback('');
+    }
+  };
+
+  const handleToggleStageOption = (optionId: string) => {
+    const currentQ = HEART_STAGE_QUESTIONS[stageIndex];
+    if (!currentQ) return;
+
+    setStageAnswers(prev => {
+      const current = prev[currentQ.id] || [];
+      if (!currentQ.multi) {
+        return { ...prev, [currentQ.id]: [optionId] };
+      }
+
+      if (optionId === 'otra') {
+        if (current.includes('otra')) {
+          return { ...prev, [currentQ.id]: [] };
+        }
+        return { ...prev, [currentQ.id]: ['otra'] };
+      } else {
+        const withoutOtra = current.filter(id => id !== 'otra');
+        if (withoutOtra.includes(optionId)) {
+          return { ...prev, [currentQ.id]: withoutOtra.filter(id => id !== optionId) };
+        } else {
+          if (withoutOtra.length >= currentQ.maxSelect) {
+            return prev;
+          }
+          return { ...prev, [currentQ.id]: [...withoutOtra, optionId] };
+        }
+      }
+    });
+  };
+
+  const handleContinueStage = () => {
+    const currentQuestion = HEART_STAGE_QUESTIONS[stageIndex];
+    if (!currentQuestion) return;
+
+    const currentSelected = stageAnswers[currentQuestion.id] || [];
+    if (currentSelected.length === 0) return;
+
+    // +10 puntos la primera vez que se completa cada etapa (con aviso +10 puntos · [stageTitle])
+    if (!scoredStageIdsRef.current.has(currentQuestion.id)) {
+      scoredStageIdsRef.current.add(currentQuestion.id);
+      setUserXp(prev => prev + 10);
+      setXpNotification({ xp: 10, label: currentQuestion.stageTitle });
+      setTimeout(() => setXpNotification(null), 3000);
+    }
+
+    if (stageIndex < HEART_STAGE_QUESTIONS.length - 1) {
+      setStageIndex(prev => prev + 1);
+    } else {
+      setTransitionFrom(6);
+      setStep('stage_transition');
+    }
+  };
+
+  // Fase 4A: avanzar desde la pantalla de cierre de etapa
+  const handleContinueTransition = () => {
+    if (transitionFrom === 1) {
+      setTransitionFrom(null);
+      setStep('deep_dive');
+    } else if (transitionFrom === 2) {
+      setTransitionFrom(null);
+      setStageIndex(0);
+      setStep('heart_stages');
+    } else {
+      setTransitionFrom(null);
+      if (validationTargets.length > 0) {
+        setValidationIndex(0);
+        setStep('validation');
+      } else {
+        setStep('generating_results');
+      }
+    }
+  };
+
+  // Fase 4A: micro-insight de una sola oración, calculado con datos reales (nunca con una sola respuesta)
+  const getStageInsight = (from: 1 | 2 | 6 | null): string => {
+    const titleOf = (id: string) => (bloquesDiagnostico as any)[id]?.title || id;
+    if (from === 1) {
+      const high = Object.entries(screeningAnswers)
+        .filter(([, sc]) => (sc as number) >= 4)
+        .sort((a, b) => (b[1] as number) - (a[1] as number))
+        .map(([id]) => titleOf(id));
+      if (high.length >= 2) return `Tus respuestas muestran más resonancia en ${high[0]} y ${high[1]}. Ahora veremos qué pensamientos hay detrás.`;
+      if (high.length === 1) return `${high[0]} es el área donde más resonaron tus respuestas. Ahora veremos qué pensamientos hay detrás.`;
+      return 'Tus respuestas son bastante equilibradas; exploraremos las áreas que más resonaron.';
+    }
+    if (from === 2) {
+      const strongByBlock: Record<string, number> = {};
+      deepDiveQuestions.forEach(q => {
+        if (deepDiveAnswers[q.id] === 2) {
+          strongByBlock[q.bloqueId] = (strongByBlock[q.bloqueId] || 0) + 1;
+        }
+      });
+      const top = Object.entries(strongByBlock).sort((a, b) => b[1] - a[1])[0];
+      if (top && top[1] >= 2) return `Varias afirmaciones sobre ${titleOf(top[0])} resonaron contigo con fuerza. Ahora exploraremos qué buscas y qué temes.`;
+      return 'Algunas afirmaciones resonaron más que otras. Ahora exploraremos qué buscas y qué temes.';
+    }
+    if (from === 6) {
+      const related = new Set<string>();
+      ['busca', 'teme'].forEach(qid => {
+        const q = HEART_STAGE_QUESTIONS.find(x => x.id === qid);
+        (stageAnswers[qid] || []).forEach(optId => {
+          if (optId === 'otra') return;
+          q?.options.find(o => o.id === optId)?.relatedBlocks.forEach(b => related.add(b));
+        });
+      });
+      const matches = activeBlocks.some(b => related.has(b));
+      if (matches) return 'Lo que buscas y lo que temes apuntan en la misma dirección que tus áreas principales.';
+      return 'Tus respuestas muestran matices distintos; vale la pena revisarlos con calma.';
+    }
+    return '';
+  };
+
+  const handleAnswerValidation = (interactionId: string, option: 'si' | 'parte' | 'no') => {
+    setValidationAnswers(prev => {
+      const next = { ...prev, [interactionId]: option };
+      localStorage.setItem('ti_validation_answers', JSON.stringify(next));
+      return next;
+    });
+
+    if (option === 'si') {
+      setValidatedInteractions(prev => {
+        const next = { ...prev, [interactionId]: true };
+        localStorage.setItem('ti_validated_interactions', JSON.stringify(next));
+        return next;
+      });
+      setRejectedInteractions(prev => {
+        const next = { ...prev, [interactionId]: false };
+        localStorage.setItem('ti_rejected_interactions', JSON.stringify(next));
+        return next;
+      });
+    } else if (option === 'parte') {
+      setValidatedInteractions(prev => {
+        const next = { ...prev, [interactionId]: false };
+        localStorage.setItem('ti_validated_interactions', JSON.stringify(next));
+        return next;
+      });
+      setRejectedInteractions(prev => {
+        const next = { ...prev, [interactionId]: false };
+        localStorage.setItem('ti_rejected_interactions', JSON.stringify(next));
+        return next;
+      });
+    } else if (option === 'no') {
+      setValidatedInteractions(prev => {
+        const next = { ...prev, [interactionId]: false };
+        localStorage.setItem('ti_validated_interactions', JSON.stringify(next));
+        return next;
+      });
+      setRejectedInteractions(prev => {
+        const next = { ...prev, [interactionId]: true };
+        localStorage.setItem('ti_rejected_interactions', JSON.stringify(next));
+        return next;
+      });
+    }
+  };
+
+  const handleContinueValidation = () => {
+    const currentInteraction = validationTargets[validationIndex];
+    if (!currentInteraction) return;
+
+    const currentSelected = validationAnswers[currentInteraction.id];
+    if (!currentSelected) return;
+
+    // +10 puntos la primera vez que se responde cada validación (con mecanismo useRef)
+    if (!scoredValidationIdsRef.current.has(currentInteraction.id)) {
+      scoredValidationIdsRef.current.add(currentInteraction.id);
+      setUserXp(prev => prev + 10);
+      setXpNotification({ xp: 10, label: "Validación de Conexión" });
+      setTimeout(() => setXpNotification(null), 3000);
+    }
+
+    if (validationIndex < validationTargets.length - 1) {
+      setValidationIndex(prev => prev + 1);
+    } else {
+      setStep('generating_results');
+    }
+  };
+
+  const handleValidationBack = () => {
+    if (validationIndex > 0) {
+      setValidationIndex(prev => prev - 1);
+    } else {
+      setStep('heart_stages');
+      setStageIndex(HEART_STAGE_QUESTIONS.length - 1);
+    }
+  };
+
+  const handleStageBack = () => {
+    if (stageIndex > 0) {
+      setStageIndex(prev => prev - 1);
+    } else {
+      setStep('deep_dive');
+      setDeepDiveIndex(Math.max(0, deepDiveQuestions.length - 1));
+      setIsAnswering(false);
+      setAnsweringFeedback('');
+    }
+  };
+
+  const handleDeepDiveBack = () => {
+    setIsAnswering(false);
+    setAnsweringFeedback('');
+    if (deepDiveIndex > 0) {
+      setDeepDiveIndex(prev => prev - 1);
+    } else {
+      setStep('screening');
     }
   };
 
@@ -717,13 +1051,31 @@ export default function App() {
         } else if (step === 'deep_dive' && isAnswering && answeringFeedback) {
           e.preventDefault();
           handleContinueDeepDive();
+        } else if (step === 'heart_stages') {
+          const currentQ = HEART_STAGE_QUESTIONS[stageIndex];
+          if (currentQ) {
+            const currentSelected = stageAnswers[currentQ.id] || [];
+            if (currentSelected.length > 0) {
+              e.preventDefault();
+              handleContinueStage();
+            }
+          }
+        } else if (step === 'stage_transition') {
+          e.preventDefault();
+          handleContinueTransition();
+        } else if (step === 'validation') {
+          const currentInter = validationTargets[validationIndex];
+          if (currentInter && validationAnswers[currentInter.id]) {
+            e.preventDefault();
+            handleContinueValidation();
+          }
         }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [step, isAnswering, answeringFeedback, screeningAnswers, currentSelectedRegion, deepDiveIndex, deepDiveQuestions]);
+  }, [step, isAnswering, answeringFeedback, screeningAnswers, currentSelectedRegion, deepDiveIndex, deepDiveQuestions, stageIndex, stageAnswers, validationIndex, validationTargets, validationAnswers, transitionFrom]);
 
   const restartJourney = () => {
     setStep('welcome');
@@ -733,6 +1085,8 @@ export default function App() {
     setDeepDiveAnswers({});
     setDeepDiveQuestions([]);
     setDeepDiveIndex(0);
+    setStageAnswers({});
+    setStageIndex(0);
     setResults([]);
     setIntroParagraph('');
     setCompletedDays({});
@@ -746,11 +1100,20 @@ export default function App() {
     setSelectedHypothesis('');
     setConfirmedHeartSteps({});
     setValidatedInteractions({});
+    setRejectedInteractions({});
+    setValidationIndex(0);
+    setValidationAnswers({});
+    setTransitionFrom(null);
+    setEmergingPattern('');
+    shownPatternsRef.current.clear();
     setSelectedBlockModalId(null);
     setUserAge('');
     setUserGoal('');
     setUserXp(0);
     setAchievements({});
+    scoredBeliefIdsRef.current.clear();
+    scoredStageIdsRef.current.clear();
+    scoredValidationIdsRef.current.clear();
     setCurrentSelectedRegion('capacidad-identidad');
     setIsAnswering(false);
     setAnsweringFeedback('');
@@ -762,6 +1125,12 @@ export default function App() {
     localStorage.removeItem('ti_deep_dive_answers');
     localStorage.removeItem('ti_deep_dive_questions');
     localStorage.removeItem('ti_deep_dive_index');
+    localStorage.removeItem('ti_stage_answers');
+    localStorage.removeItem('ti_stage_index');
+    localStorage.removeItem('ti_rejected_interactions');
+    localStorage.removeItem('ti_validation_index');
+    localStorage.removeItem('ti_validation_answers');
+    localStorage.removeItem('ti_transition_from');
     localStorage.removeItem('ti_results');
     localStorage.removeItem('ti_intro_paragraph');
     localStorage.removeItem('ti_completed_days');
@@ -800,7 +1169,8 @@ export default function App() {
           activeBeliefs: compiledResults.slice(0, 5),
           userAge,
           userGoal,
-          screeningAnswers
+          screeningAnswers,
+          stageSummary
         })
       });
 
@@ -808,19 +1178,33 @@ export default function App() {
         const data = await response.json();
         if (data.useFallback) {
           console.log("No GEMINI_API_KEY configured on server. Creating dynamic local fallback.");
-          const fallback = generateFallbackData(primary, userName, userEmail, compiledResults, screeningAnswers);
+          const fallback = generateFallbackData(primary, userName, userEmail, compiledResults, screeningAnswers, stageSummary);
           setAiDiagnosis(fallback);
         } else {
-          setAiDiagnosis(data);
+          const fallback = generateFallbackData(primary, userName, userEmail, compiledResults, screeningAnswers, stageSummary);
+          const completeDiagnosis = { ...data };
+          if (!completeDiagnosis.mapaDelCorazon) {
+            completeDiagnosis.mapaDelCorazon = fallback.mapaDelCorazon;
+          } else if (fallback.mapaDelCorazon) {
+            const steps = ["circunstancia", "interpretacion", "deseo", "temor", "estrategiaControl", "respuesta", "fruto"] as const;
+            completeDiagnosis.mapaDelCorazon = { ...completeDiagnosis.mapaDelCorazon };
+            for (const stepKey of steps) {
+              const currentStep = completeDiagnosis.mapaDelCorazon[stepKey];
+              if (!currentStep || !currentStep.contenido || currentStep.contenido.trim() === "" || currentStep.contenido === "No provisto") {
+                completeDiagnosis.mapaDelCorazon[stepKey] = fallback.mapaDelCorazon[stepKey];
+              }
+            }
+          }
+          setAiDiagnosis(completeDiagnosis);
         }
       } else {
         console.warn("API Server responded with non-200. Proceeding with dynamic fallback.");
-        const fallback = generateFallbackData(primary, userName, userEmail, compiledResults, screeningAnswers);
+        const fallback = generateFallbackData(primary, userName, userEmail, compiledResults, screeningAnswers, stageSummary);
         setAiDiagnosis(fallback);
       }
     } catch (err) {
       console.error("Failed to query API for AI Diagnosis:", err);
-      const fallback = generateFallbackData(primary, userName, userEmail, compiledResults, screeningAnswers);
+      const fallback = generateFallbackData(primary, userName, userEmail, compiledResults, screeningAnswers, stageSummary);
       setAiDiagnosis(fallback);
     } finally {
       setLoadingAi(false);
@@ -1010,14 +1394,6 @@ export default function App() {
     };
   }, [dominantBlocks, sortedBlocksWithScores]);
 
-  // Interacciones dinámicas detectadas entre bloques
-  const detectedInteractions = useMemo(() => {
-    if (aiDiagnosis?.interacciones && aiDiagnosis.interacciones.length > 0) {
-      return aiDiagnosis.interacciones;
-    }
-    return detectBlockInteractions(screeningAnswers);
-  }, [screeningAnswers, aiDiagnosis]);
-
   // Nivel de confianza calculado para cada interacción según los 6 factores metodológicos
   const interactionConfidence = useMemo(() => {
     const map: Record<string, ConfidenceEvaluation> = {};
@@ -1049,13 +1425,20 @@ export default function App() {
         nivel = 'MODERADA';
       }
 
+      // Si rejectedInteractions[inter.id] es true, baja UN escalón el nivel calculado (ALTA → MODERADA → BAJA → INSUFICIENTE)
+      if (rejectedInteractions[inter.id]) {
+        if (nivel === 'ALTA') nivel = 'MODERADA';
+        else if (nivel === 'MODERADA') nivel = 'BAJA';
+        else if (nivel === 'BAJA') nivel = 'INSUFICIENTE';
+      }
+
       map[inter.id] = {
         ...evaluation,
         nivel
       };
     });
     return map;
-  }, [detectedInteractions, screeningAnswers, validatedInteractions]);
+  }, [detectedInteractions, screeningAnswers, validatedInteractions, rejectedInteractions]);
 
   // Healthiest / freest areas (score <= 2 or the lowest 3)
   const healthiestBlocks = useMemo(() => {
@@ -1082,7 +1465,17 @@ export default function App() {
     Object.entries(interactionConfidence).forEach(([id, conf]) => {
       levelsMap[id] = (conf as ConfidenceEvaluation).nivel;
     });
-    downloadPDFResults(userName, userEmail, aiDiagnosis, results, journalNotes, levelsMap);
+    downloadPDFResults(
+      userName,
+      userEmail,
+      aiDiagnosis,
+      results,
+      journalNotes,
+      levelsMap,
+      stageSummary,
+      detectedInteractions,
+      rejectedInteractions
+    );
   };
 
   return (
@@ -1090,6 +1483,48 @@ export default function App() {
       
       {/* Absolute elegant particle overlay */}
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(201,168,76,0.12),rgba(0,0,0,0))] pointer-events-none" />
+
+      {/* Floating Notifications: XP and Achievements (Top-Right) */}
+      <div className="fixed top-5 right-5 z-50 flex flex-col gap-2.5 max-w-sm pointer-events-none px-4 sm:px-0">
+        <AnimatePresence>
+          {xpNotification && (
+            <motion.div
+              key="xp-notification-toast"
+              initial={{ opacity: 0, y: -10, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -10, scale: 0.95 }}
+              transition={{ duration: 0.3 }}
+              className="pointer-events-auto bg-[#141414]/95 border border-[#C9A84C]/60 text-white px-4 py-2.5 rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.6)] backdrop-blur-md flex items-center gap-2.5"
+            >
+              <span className="w-2 h-2 rounded-full bg-[#C9A84C] animate-pulse flex-shrink-0" />
+              <span className="text-xs font-mono text-white/90">
+                <strong className="text-[#C9A84C] font-bold">+{xpNotification.xp} puntos</strong> · {xpNotification.label}
+              </span>
+            </motion.div>
+          )}
+
+          {newAchievementAlert && (
+            <motion.div
+              key="achievement-alert-toast"
+              initial={{ opacity: 0, y: -10, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -10, scale: 0.95 }}
+              transition={{ duration: 0.3 }}
+              className="pointer-events-auto bg-[#141414]/95 border border-[#C9A84C] text-white p-3.5 rounded-xl shadow-[0_4px_25px_rgba(201,168,76,0.25)] backdrop-blur-md space-y-1"
+            >
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-[#C9A84C] animate-pulse flex-shrink-0" />
+                <span className="text-[11px] font-mono uppercase tracking-wider font-bold text-[#C9A84C]">
+                  {newAchievementAlert.name}
+                </span>
+              </div>
+              <p className="text-xs text-white/80 font-sans pl-6">
+                {newAchievementAlert.description}
+              </p>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
 
       <motion.div 
         initial={{ opacity: 0, y: 15 }}
@@ -1125,6 +1560,9 @@ export default function App() {
                     {step === 'screening' && ` Screening: ${Object.keys(screeningAnswers).length} / 9`}
                     {step === 'calculating_blocks' && `Calculando activación`}
                     {step === 'deep_dive' && `Profundización: ${deepDiveIndex + 1} / ${deepDiveQuestions.length}`}
+                    {step === 'heart_stages' && `Exploración: ${stageIndex + 1} / 4`}
+                    {step === 'validation' && `Validación: ${validationIndex + 1} / ${validationTargets.length}`}
+                    {step === 'stage_transition' && 'Etapa completada'}
                     {step === 'results' && 'Tu mapa de exploración'}
                   </span>
                 </div>
@@ -1137,7 +1575,10 @@ export default function App() {
                         step === 'screening' ? (Object.keys(screeningAnswers).length / 9) * 100 :
                         step === 'calculating_blocks' ? 50 :
                         step === 'deep_dive' ? (50 + ((deepDiveIndex + 1) / deepDiveQuestions.length) * 50) :
-                        step === 'generating_results' ? 95 : 100
+                        step === 'heart_stages' ? 90 :
+                        step === 'validation' ? 95 :
+                        step === 'stage_transition' ? (transitionFrom === 1 ? 50 : transitionFrom === 2 ? 85 : 92) :
+                        step === 'generating_results' ? 98 : 100
                       }%` 
                     }}
                     transition={{ duration: 0.3 }}
@@ -1264,7 +1705,7 @@ export default function App() {
                       </div>
                       <div className="space-y-1">
                         <span className="text-[10px] font-mono uppercase tracking-widest text-[#C9A84C] font-bold block">
-                          Principio Fundamental • Regla Pastoral de Oro (Prompt 20)
+                          Principio Fundamental • Regla Pastoral de Oro
                         </span>
                         <p className="text-[11px] text-white/70 leading-relaxed font-sans italic">
                           «La herramienta no pretende decirle al consejero quién es la persona. Pretende ayudarle a hacer mejores preguntas para comprender cómo esa persona está interpretando sus circunstancias, qué está buscando, qué teme, cómo responde y dónde necesita ser redirigida hacia la verdad de Dios y la suficiencia de Cristo.»
@@ -1419,14 +1860,16 @@ export default function App() {
                       </button>
 
                       {/* Botón de Simulación de Prueba Rápida (Prompt 19) */}
-                      <button
-                        type="button"
-                        onClick={handleLoadSimulatedCase19}
-                        className="w-full bg-[#181818] hover:bg-[#222222] border border-[#C9A84C]/40 text-[#C9A84C] font-mono text-xs font-bold py-3 px-4 rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer"
-                      >
-                        <Sparkles className="w-3.5 h-3.5" />
-                        <span>PROBAR CASO REAL SIMULADO (Prompt 19: Control 5, Tiempo 5)</span>
-                      </button>
+                      {SHOW_TEST_TOOLS && (
+                        <button
+                          type="button"
+                          onClick={handleLoadSimulatedCase19}
+                          className="w-full bg-[#181818] hover:bg-[#222222] border border-[#C9A84C]/40 text-[#C9A84C] font-mono text-xs font-bold py-3 px-4 rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer"
+                        >
+                          <Sparkles className="w-3.5 h-3.5" />
+                          <span>PROBAR CASO REAL SIMULADO (Control 5, Tiempo 5)</span>
+                        </button>
+                      )}
 
                       {/* Supportive Info Badge List (Structured layout) */}
                       <div className="grid grid-cols-2 gap-3 pt-3.5 border-t border-white/5">
@@ -1463,6 +1906,7 @@ export default function App() {
             {step === 'screening' && (
               USE_GUIDED_FLOW ? (
                 <GuidedExplorationFlow
+                  mode="screening"
                   bloquesDiagnostico={bloquesDiagnostico}
                   currentSelectedRegion={currentSelectedRegion}
                   screeningAnswers={screeningAnswers}
@@ -1476,7 +1920,9 @@ export default function App() {
                     setCurrentSelectedRegion(id);
                     setIsAnswering(false);
                     setAnsweringFeedback('');
+                    setEmergingPattern('');
                   }}
+                  emergingPattern={emergingPattern}
                 />
               ) : (
                 <motion.div
@@ -1796,13 +2242,30 @@ export default function App() {
 
             {/* STEP 4: DEEP DIVE (CAPA 2) - EL DESCENSO DE DESCUBRIMIENTO */}
             {step === 'deep_dive' && (
-              <motion.div
-                key="deep-dive-pane"
-                initial={{ opacity: 0, scale: 0.98 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.98 }}
-                className="space-y-6 max-w-6xl mx-auto"
-              >
+              USE_GUIDED_FLOW ? (
+                <GuidedExplorationFlow
+                  mode="deepDive"
+                  deepDiveQuestions={deepDiveQuestions}
+                  deepDiveIndex={deepDiveIndex}
+                  deepDiveAnswers={deepDiveAnswers}
+                  isAnswering={isAnswering}
+                  answeringFeedback={answeringFeedback}
+                  userXp={userXp}
+                  getExploradorLevel={getExploradorLevel}
+                  onAnswer={handleDeepDiveAnswer}
+                  onContinue={handleContinueDeepDive}
+                  onBack={handleDeepDiveBack}
+                  reflectionKey="deep-dive-start"
+                  reflectionPrompt={deepDiveIndex === 0 ? 'Antes de empezar: piensa en una situación concreta de las últimas semanas que te haya generado presión. Tenla presente mientras lees cada afirmación.' : undefined}
+                />
+              ) : (
+                <motion.div
+                  key="deep-dive-pane"
+                  initial={{ opacity: 0, scale: 0.98 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.98 }}
+                  className="space-y-6 max-w-6xl mx-auto"
+                >
                 {/* Descenso Top HUD Bar */}
                 <div className="bg-[#121212]/95 border border-[#C9A84C]/20 rounded-2xl p-4 flex flex-col sm:flex-row justify-between items-center gap-4 shadow-xl relative overflow-hidden">
                   <div className="absolute left-0 top-0 bottom-0 w-2 h-full bg-[#C9A84C]/80" />
@@ -2007,15 +2470,7 @@ export default function App() {
                     <div className="flex justify-between items-center border-t border-white/5 pt-4">
                       {/* Back Button */}
                       <button 
-                        onClick={() => {
-                          setIsAnswering(false);
-                          setAnsweringFeedback('');
-                          if (deepDiveIndex > 0) {
-                            setDeepDiveIndex(prev => prev - 1);
-                          } else {
-                            setStep('screening');
-                          }
-                        }}
+                        onClick={handleDeepDiveBack}
                         className="flex items-center gap-1 text-white/45 hover:text-white text-xs transition-colors cursor-pointer font-bold font-mono"
                       >
                         <ArrowLeft className="w-3.5 h-3.5" /> Atrás
@@ -2030,6 +2485,68 @@ export default function App() {
 
                 </div>
               </motion.div>
+              )
+            )}
+
+            {/* STEP 4.5: HEART STAGES (ETAPAS 03-06: LO QUE BUSCAS, TEMES, CÓMO TE PROTEGES, LO QUE PRODUCE) */}
+            {step === 'heart_stages' && (
+              <GuidedExplorationFlow
+                mode="stage"
+                stageQuestion={HEART_STAGE_QUESTIONS[stageIndex]}
+                selectedOptions={stageAnswers[HEART_STAGE_QUESTIONS[stageIndex]?.id] || []}
+                dominantAreaTitle={primaryBlock.title}
+                userXp={userXp}
+                getExploradorLevel={getExploradorLevel}
+                onToggleOption={handleToggleStageOption}
+                onContinue={handleContinueStage}
+                onBack={handleStageBack}
+                reflectionKey={`stage-${HEART_STAGE_QUESTIONS[stageIndex]?.id}`}
+                reflectionPrompt={
+                  HEART_STAGE_QUESTIONS[stageIndex]?.id === 'busca'
+                    ? 'Piensa en una situación real de esta última semana en la que sentiste que debías sostenerlo todo. ¿Qué había en juego para ti?'
+                    : HEART_STAGE_QUESTIONS[stageIndex]?.id === 'teme'
+                    ? 'Vuelve a esa misma situación: si todo hubiera salido mal, ¿qué habría sido lo más difícil para ti?'
+                    : undefined
+                }
+              />
+            )}
+
+            {/* STEP 4.55: CIERRE DE ETAPA CON MICRO-INSIGHT (FASE 4A) */}
+            {step === 'stage_transition' && (
+              <GuidedExplorationFlow
+                mode="transition"
+                transitionLabel={
+                  transitionFrom === 1 ? 'ETAPA 01 COMPLETADA · LO QUE HACES'
+                  : transitionFrom === 2 ? 'ETAPA 02 COMPLETADA · LO QUE PIENSAS'
+                  : 'ETAPA 06 COMPLETADA · LO QUE ESTO PRODUCE'
+                }
+                transitionInsight={getStageInsight(transitionFrom)}
+                transitionNext={
+                  transitionFrom === 1 ? 'Siguiente: 02 · Lo que piensas'
+                  : transitionFrom === 2 ? 'Siguiente: 03 · Lo que buscas'
+                  : validationTargets.length > 0 ? 'Siguiente: 07 · Lo que necesitamos explorar'
+                  : 'Siguiente: Tu mapa de exploración'
+                }
+                userXp={userXp}
+                getExploradorLevel={getExploradorLevel}
+                onContinue={handleContinueTransition}
+              />
+            )}
+
+            {/* STEP 4.6: VALIDATION (ETAPA 07: VALIDACIÓN ANTES DE LOS RESULTADOS) */}
+            {step === 'validation' && validationTargets[validationIndex] && (
+              <GuidedExplorationFlow
+                mode="validation"
+                validationTarget={validationTargets[validationIndex]}
+                validationIndex={validationIndex}
+                validationTotal={validationTargets.length}
+                selectedValidationOption={validationAnswers[validationTargets[validationIndex].id]}
+                userXp={userXp}
+                getExploradorLevel={getExploradorLevel}
+                onAnswerValidation={(option) => handleAnswerValidation(validationTargets[validationIndex].id, option)}
+                onContinue={handleContinueValidation}
+                onBack={handleValidationBack}
+              />
             )}
 
             {/* STEP 5: INTERMEDIATE CALC RESULTS */}
@@ -2083,7 +2600,7 @@ export default function App() {
                   </div>
 
                   <h2 className="text-3xl sm:text-4xl font-bold font-display text-white tracking-tight">
-                    Tu Diseño Revelado está Listo
+                    Tu mapa de exploración está listo
                   </h2>
                 </div>
 
@@ -2095,10 +2612,7 @@ export default function App() {
                       Querido/a <strong className="text-white font-semibold font-display text-lg">{userName}</strong>,
                     </p>
                     <p>
-                      Te encuentras ante un espejo de Gracia inmerecida. Lo que estás por presenciar no es un reporte estadístico secular de tus deficiencias corporativas, sino una <strong>revelación profética y clínica</strong> de cómo los temores involuntarios han intentado entorpecer tu mente, y del plan de renovación cerebral y espiritual que Cristo ya selló para ti.
-                    </p>
-                    <p>
-                      Sondeamos con reverencia los recovecos inconscientes y los confrontamos con la soberanía insustituible de tu filiación celestial. Procede de rodillas en tu espíritu...
+                      A continuación verás lo que muestran tus respuestas: las áreas donde hay más tensión, algunos patrones posibles y preguntas para seguir explorando. No es un diagnóstico ni una etiqueta; es un punto de partida para reflexionar, conversar con tu consejero y buscar dirección en la Palabra de Dios.
                     </p>
                   </div>
 
@@ -2118,10 +2632,10 @@ export default function App() {
                     }}
                     className="relative bg-gradient-to-r from-[#C9A84C] to-amber-600 hover:from-yellow-400 hover:to-amber-500 text-[#0d0d0d] font-bold px-12 py-5 rounded-2xl text-lg shadow-2xl hover:shadow-[#C9A84C]/20 hover:scale-[1.02] transition-all flex items-center justify-center gap-3 w-full sm:w-auto mx-auto cursor-pointer"
                   >
-                    <CheckCircle className="w-6 h-6" /> Develar mi Renovación de Identidad
+                    <CheckCircle className="w-6 h-6" /> Ver mi mapa de exploración
                   </button>
                   <p className="text-white/40 text-xs font-mono">
-                    🛡️ Tu diagnóstico permanecerá archivado localmente con máxima privacidad en tu dispositivo.
+                    Tus respuestas se guardan solo en este dispositivo.
                   </p>
                 </div>
               </motion.div>
@@ -2247,6 +2761,8 @@ export default function App() {
                         userName={userName || 'Aconsejado'}
                         onLoadCase19={handleLoadSimulatedCase19}
                         isSimulatedCase19={isSimulatedCase19}
+                        showTestTools={SHOW_TEST_TOOLS}
+                        stageSummary={stageSummary}
                       />
 
                       {/* BANNER METODOLÓGICO: FILOSOFÍA DE EXPLORACIÓN Y DISCERNIMIENTO */}
@@ -2265,7 +2781,7 @@ export default function App() {
                               </span>
                             </div>
                             <p className="text-white/85 leading-relaxed">
-                              <strong>Principio Fundamental (Prompt 20):</strong> «La herramienta no pretende decirle al consejero quién es la persona. Pretende ayudarle a hacer mejores preguntas para comprender cómo esa persona está interpretando sus circunstancias, qué está buscando, qué teme, cómo responde y dónde necesita ser redirigida hacia la verdad de Dios y la suficiencia de Cristo.»
+                              <strong>Principio Fundamental:</strong> «La herramienta no pretende decirle al consejero quién es la persona. Pretende ayudarle a hacer mejores preguntas para comprender cómo esa persona está interpretando sus circunstancias, qué está buscando, qué teme, cómo responde y dónde necesita ser redirigida hacia la verdad de Dios y la suficiencia de Cristo.»
                             </p>
                             <p className="text-[#C9A84C] font-mono text-[11px] pt-0.5">
                               La meta no es producir una etiqueta. La meta es producir un mapa de comprensión y una dirección de ayuda.
@@ -2517,7 +3033,7 @@ export default function App() {
                               </span>
                             </div>
                             <p className="text-xs text-white/60 leading-relaxed">
-                              Lleva estas tres preguntas a tu intimidad con Dios o a tu espacio de conversación pastoral. No busques respuestas apresuradas:
+                              Lleva estas preguntas a tu intimidad con Dios o a tu espacio de conversación pastoral. No busques respuestas apresuradas:
                             </p>
 
                             <div className="space-y-2.5 pt-1">
@@ -2873,9 +3389,15 @@ export default function App() {
                         {detectedInteractions.length > 0 ? (
                           <div className="space-y-4">
                             {[...detectedInteractions]
-                              .sort((a, b) => (a.nivel === 'patron' ? 0 : 1) - (b.nivel === 'patron' ? 0 : 1))
+                              .sort((a, b) => {
+                                const aRej = rejectedInteractions[a.id] ? 1 : 0;
+                                const bRej = rejectedInteractions[b.id] ? 1 : 0;
+                                if (aRej !== bRej) return aRej - bRej;
+                                return (a.nivel === 'patron' ? 0 : 1) - (b.nivel === 'patron' ? 0 : 1);
+                              })
                               .map((inter, idx) => {
                                 const isValidated = validatedInteractions[inter.id];
+                                const isRejected = rejectedInteractions[inter.id];
                                 const isSignal = inter.nivel === 'senal';
                                 const confEvaluation = interactionConfidence[inter.id];
                                 const confLevel = confEvaluation?.nivel || 'MODERADA';
@@ -2884,10 +3406,12 @@ export default function App() {
                                   <div
                                     key={inter.id || idx}
                                     className={`p-5 rounded-2xl border transition-all space-y-4 ${
-                                      isSignal ? 'opacity-70' : ''
+                                      isRejected ? 'opacity-50' : isSignal ? 'opacity-70' : ''
                                     } ${
                                       isValidated
                                         ? 'bg-emerald-950/25 border-emerald-500/40 shadow-lg shadow-emerald-500/5'
+                                        : isRejected
+                                        ? 'bg-black/20 border-white/5'
                                         : 'bg-black/35 border-white/10 hover:border-[#C9A84C]/40'
                                     }`}
                                   >
@@ -2904,6 +3428,11 @@ export default function App() {
                                         {isSignal && (
                                           <span className="px-2.5 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-[10px] font-mono font-bold text-amber-300 uppercase tracking-wider">
                                             Señal débil — a explorar
+                                          </span>
+                                        )}
+                                        {isRejected && (
+                                          <span className="px-2.5 py-0.5 rounded-full bg-rose-500/15 border border-rose-500/30 text-[10px] font-mono font-bold text-rose-300 uppercase tracking-wider">
+                                            No te identificaste
                                           </span>
                                         )}
                                         <span className={`px-2.5 py-0.5 rounded-full border text-[10px] font-mono font-bold uppercase tracking-wider inline-flex items-center gap-1.5 ${confBadge.badgeBg}`}>
@@ -3013,151 +3542,23 @@ export default function App() {
                         </p>
                       </div>
 
-                      {/* SECCIÓN 7: MAPA RADAR & CLASIFICACIÓN DE PERFIL */}
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start pt-2">
-                        {/* SVG Radar Chart component (Optimizado para móvil sin cortes) */}
-                        <div className="bg-[#141414] p-4 sm:p-7 rounded-3xl border border-white/5 flex flex-col items-center">
-                          <span className="text-xs text-[#C9A84C] font-mono uppercase font-bold mb-4 text-center tracking-wide">
-                            MAPA DE ACTIVACIÓN COGNITIVA (9 BLOQUES)
-                          </span>
-                          
-                          <div className="w-full max-w-[340px] aspect-square relative">
-                            <svg viewBox="-30 -30 420 420" className="w-full h-full overflow-visible">
-                              {/* Background concentric reference rings */}
-                              {[0.2, 0.4, 0.6, 0.8, 1.0].map((scale, sIdx) => (
-                                <polygon
-                                  key={sIdx}
-                                  points={radarPoints.map(p => {
-                                    const angle = p.angle;
-                                    const x = 180 + 90 * scale * Math.cos(angle);
-                                    const y = 180 + 90 * scale * Math.sin(angle);
-                                    return `${x},${y}`;
-                                  }).join(' ')}
-                                  fill="none"
-                                  stroke="rgba(255, 255, 255, 0.07)"
-                                  strokeWidth="1"
-                                />
-                              ))}
-
-                              {/* Level 3 Dotted Threshold Ring (Severidad) */}
-                              <polygon
-                                points={radarLevel3String}
-                                fill="none"
-                                stroke="#EF4444"
-                                strokeWidth="1.5"
-                                strokeDasharray="3 3"
-                                opacity="0.65"
-                              />
-
-                              {/* Axis lines from center */}
-                              {radarPoints.map((p, idx) => (
-                                <line
-                                  key={idx}
-                                  x1="180"
-                                  y1="180"
-                                  x2={p.outerX}
-                                  y2={p.outerY}
-                                  stroke="rgba(255, 255, 255, 0.08)"
-                                  strokeWidth="1"
-                                />
-                              ))}
-
-                              {/* Outer boundary polygon */}
-                              <polygon
-                                points={radarOuterString}
-                                fill="none"
-                                stroke="rgba(201, 168, 76, 0.15)"
-                                strokeWidth="1"
-                              />
-
-                              {/* Filled data polygon */}
-                              <polygon
-                                points={radarPointsString}
-                                fill="rgba(201, 168, 76, 0.22)"
-                                stroke="#C9A84C"
-                                strokeWidth="2.5"
-                                className="filter drop-shadow-[0_0_10px_rgba(201,168,76,0.35)]"
-                              />
-
-                              {/* Individual score nodes */}
-                              {radarPoints.map((p, idx) => {
-                                const isSevere = p.score >= 3;
-                                return (
-                                  <circle
-                                    key={idx}
-                                    cx={p.x}
-                                    cy={p.y}
-                                    r={isSevere ? 5 : 4}
-                                    fill={isSevere ? '#EF4444' : '#C9A84C'}
-                                    stroke={isSevere ? '#FFFFFF' : '#0D0D0D'}
-                                    strokeWidth={isSevere ? 1.5 : 1}
-                                    className={isSevere ? 'filter drop-shadow-[0_0_6px_rgba(239,68,68,0.8)]' : ''}
-                                  />
-                                );
-                              })}
-
-                              {/* Labels positioned cleanly with wide margins to avoid clipping */}
-                              {radarPoints.map((p, idx) => {
-                                const angle = p.angle;
-                                const offsetDist = 110;
-                                const textX = 180 + offsetDist * Math.cos(angle);
-                                const textY = 180 + offsetDist * Math.sin(angle);
-                                
-                                let textAnchor = 'middle';
-                                if (Math.cos(angle) > 0.25) textAnchor = 'start';
-                                else if (Math.cos(angle) < -0.25) textAnchor = 'end';
-
-                                let dy = '3';
-                                if (Math.sin(angle) < -0.7) dy = '-6';
-                                else if (Math.sin(angle) > 0.7) dy = '12';
-
-                                return (
-                                  <text
-                                    key={idx}
-                                    x={textX}
-                                    y={textY}
-                                    dy={dy}
-                                    textAnchor={textAnchor}
-                                    className="fill-white/80 text-[9.5px] sm:text-[10.5px] font-mono tracking-tight font-medium"
-                                  >
-                                    {p.shortTitle}{' '}
-                                    <tspan className={p.score >= 3 ? 'fill-red-400 font-bold' : 'fill-[#C9A84C] font-bold'}>
-                                      ({p.score}/5)
-                                    </tspan>
-                                  </text>
-                                );
-                              })}
-                            </svg>
+                      {/* SECCIÓN 7: CLASIFICACIÓN DE PERFIL & ÁREAS DE RESONANCIA */}
+                      <div className="space-y-8 pt-2">
+                        {/* Lista de áreas ordenadas por resonancia (ancho completo) */}
+                        <div className="bg-[#141414] p-5 sm:p-7 rounded-3xl border border-white/5 space-y-4">
+                          <div className="flex justify-between items-center text-xs font-mono text-white/50 px-1 border-b border-white/5 pb-3">
+                            <span className="text-xs sm:text-sm text-[#C9A84C] font-mono uppercase font-bold tracking-wide">
+                              Áreas ordenadas por resonancia
+                            </span>
+                            <span>Puntaje</span>
                           </div>
-
-                          {/* Distinct Legend */}
-                          <div className="flex flex-wrap gap-3 sm:gap-5 mt-6 text-[11px] font-mono text-white/70 justify-center">
-                            <div className="flex items-center gap-1.5">
-                              <span className="w-2.5 h-2.5 bg-[#C9A84C] rounded-full inline-block" />
-                              <span>Nivel Leve / Sano (&lt;3)</span>
-                            </div>
-                            <div className="flex items-center gap-1.5">
-                              <span className="w-2.5 h-2.5 bg-red-400 rounded-full inline-block shadow-[0_0_6px_rgba(248,113,113,0.7)]" />
-                              <span className="text-red-300 font-semibold">Activación Severa (≥3)</span>
-                            </div>
-                            <div className="flex items-center gap-1.5">
-                              <span className="w-3.5 h-0.5 border-b-2 border-dashed border-red-400 inline-block" />
-                              <span className="text-white/60">Umbral Alerta (3)</span>
-                            </div>
-                          </div>
-
-                          {/* Ordered list of 9 blocks below radar */}
-                          <div className="w-full mt-6 space-y-2 border-t border-white/5 pt-4">
-                            <div className="flex justify-between items-center text-[11px] font-mono text-white/50 px-1">
-                              <span>Bloques ordenados por activación</span>
-                              <span>Puntaje</span>
-                            </div>
+                          <div className="space-y-2.5">
                             {sortedBlocksWithScores.map((b) => {
                               const isSevere = b.score >= 3;
                               const percent = (b.score / 5) * 100;
                               return (
-                                <div key={b.id} className="bg-[#101010] border border-white/5 rounded-xl p-2.5 space-y-1.5">
-                                  <div className="flex justify-between items-center text-xs">
+                                <div key={b.id} className="bg-[#101010] border border-white/5 rounded-xl p-3 space-y-1.5">
+                                  <div className="flex justify-between items-center text-xs sm:text-sm">
                                     <div className="flex items-center gap-2">
                                       <span className="font-medium text-white/90">{b.title}</span>
                                       <button

@@ -29,7 +29,7 @@ if (geminiApiKey) {
 // API Route for comprehensive dynamic Christ-Centered Neuro-Spirituality Diagnosis (Fases 1-8)
 app.post("/api/diagnostico", async (req, res) => {
   try {
-    const { userName, userEmail, primaryBelief, activeBeliefs, userAge, userGoal, screeningAnswers = {} } = req.body;
+    const { userName, userEmail, primaryBelief, activeBeliefs, userAge, userGoal, screeningAnswers = {}, stageSummary = {} } = req.body;
 
     if (!userName || !primaryBelief) {
       return res.status(400).json({ error: "Missing required fields: userName and primaryBelief." });
@@ -67,6 +67,33 @@ app.post("/api/diagnostico", async (req, res) => {
         }))
       : [];
 
+    const hasStageData = stageSummary && (
+      (Array.isArray(stageSummary.busca) && stageSummary.busca.length > 0) ||
+      (Array.isArray(stageSummary.teme) && stageSummary.teme.length > 0) ||
+      (Array.isArray(stageSummary.protege) && stageSummary.protege.length > 0) ||
+      (Array.isArray(stageSummary.produce) && stageSummary.produce.length > 0)
+    );
+
+    let stageSummaryPromptText = "";
+    if (hasStageData) {
+      const lines: string[] = [];
+      if (Array.isArray(stageSummary.busca) && stageSummary.busca.length > 0) {
+        lines.push(`- Lo que busca asegurar: ${stageSummary.busca.join(", ")}`);
+      }
+      if (Array.isArray(stageSummary.teme) && stageSummary.teme.length > 0) {
+        lines.push(`- Lo que más teme: ${stageSummary.teme.join(", ")}`);
+      }
+      if (Array.isArray(stageSummary.protege) && stageSummary.protege.length > 0) {
+        lines.push(`- Cómo suele protegerse: ${stageSummary.protege.join(", ")}`);
+      }
+      if (Array.isArray(stageSummary.produce) && stageSummary.produce.length > 0) {
+        lines.push(`- Dónde nota el desgaste: ${stageSummary.produce.join(", ")}`);
+      }
+      if (lines.length > 0) {
+        stageSummaryPromptText = `\n${lines.join("\n")}\n\nEstas cuatro respuestas las eligió la persona. Úsalas como base para los pasos DESEO, TEMOR, ESTRATEGIA DE CONTROL y FRUTO del mapaDelCorazon, citándolas, sin contradecirlas y sin añadir etiquetas.`;
+      }
+    }
+
     const prompt = `
 Actúa como un consejero bíblico pastoral sabio y empático, con profunda comprensión de la renovación mental (Romanos 12:2) y la consejería centrada en el Evangelio de la gracia de Cristo.
 
@@ -77,7 +104,7 @@ DATOS REPORTADOS POR EL USUARIO:
 - Puntajes del screening (1 a 5) por área: ${screeningSummary}
 - Área con mayor resonancia en el screening: ${primaryBlockTitle} (${primaryScore}/5)
 - Afirmación marcada en el cuestionario: "${primaryBelief.afirmacionTest}"
-- Respuestas en otras áreas activadas: ${JSON.stringify(sanitizedActiveBeliefs)}
+- Respuestas en otras áreas activadas: ${JSON.stringify(sanitizedActiveBeliefs)}${stageSummaryPromptText}
 
 FILOSOFÍA CENTRAL DE ATENCIÓN (OBLIGATORIA):
 La aplicación NO diagnostica personas de forma dogmática ni etiqueta corazones.
@@ -188,9 +215,11 @@ Personaliza las 4 dimensiones de costo a la luz del área dominante y la meta vi
             mapaDelCorazon: {
               type: Type.OBJECT,
               description: "MODELO DE ANÁLISIS DEL CORAZÓN (7 NIVELES: CIRCUNSTANCIA -> FRUTO)",
+              required: ["circunstancia", "interpretacion", "deseo", "temor", "estrategiaControl", "respuesta", "fruto"],
               properties: {
                 circunstancia: {
                   type: Type.OBJECT,
+                  required: ["contenido"],
                   properties: {
                     step: { type: Type.STRING },
                     label: { type: Type.STRING },
@@ -202,6 +231,7 @@ Personaliza las 4 dimensiones de costo a la luz del área dominante y la meta vi
                 },
                 interpretacion: {
                   type: Type.OBJECT,
+                  required: ["contenido"],
                   properties: {
                     step: { type: Type.STRING },
                     label: { type: Type.STRING },
@@ -213,6 +243,7 @@ Personaliza las 4 dimensiones de costo a la luz del área dominante y la meta vi
                 },
                 deseo: {
                   type: Type.OBJECT,
+                  required: ["contenido"],
                   properties: {
                     step: { type: Type.STRING },
                     label: { type: Type.STRING },
@@ -224,6 +255,7 @@ Personaliza las 4 dimensiones de costo a la luz del área dominante y la meta vi
                 },
                 temor: {
                   type: Type.OBJECT,
+                  required: ["contenido"],
                   properties: {
                     step: { type: Type.STRING },
                     label: { type: Type.STRING },
@@ -235,6 +267,7 @@ Personaliza las 4 dimensiones de costo a la luz del área dominante y la meta vi
                 },
                 estrategiaControl: {
                   type: Type.OBJECT,
+                  required: ["contenido"],
                   properties: {
                     step: { type: Type.STRING },
                     label: { type: Type.STRING },
@@ -246,6 +279,7 @@ Personaliza las 4 dimensiones de costo a la luz del área dominante y la meta vi
                 },
                 respuesta: {
                   type: Type.OBJECT,
+                  required: ["contenido"],
                   properties: {
                     step: { type: Type.STRING },
                     label: { type: Type.STRING },
@@ -257,6 +291,7 @@ Personaliza las 4 dimensiones de costo a la luz del área dominante y la meta vi
                 },
                 fruto: {
                   type: Type.OBJECT,
+                  required: ["contenido"],
                   properties: {
                     step: { type: Type.STRING },
                     label: { type: Type.STRING },

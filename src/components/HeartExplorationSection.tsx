@@ -45,6 +45,13 @@ interface Props {
   userName: string;
   onLoadCase19?: () => void;
   isSimulatedCase19?: boolean;
+  showTestTools?: boolean;
+  stageSummary?: {
+    busca: string[];
+    teme: string[];
+    protege: string[];
+    produce: string[];
+  };
 }
 
 export const HeartExplorationSection: React.FC<Props> = ({
@@ -56,7 +63,9 @@ export const HeartExplorationSection: React.FC<Props> = ({
   behavioralTask,
   userName,
   onLoadCase19,
-  isSimulatedCase19 = false
+  isSimulatedCase19 = false,
+  showTestTools = false,
+  stageSummary
 }) => {
   const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({
     'circunstancia': true,
@@ -153,14 +162,75 @@ export const HeartExplorationSection: React.FC<Props> = ({
       </div>
 
       {/* ========================================================
+          TARJETA: LO QUE COMPARTISTE (ETAPAS 03–06)
+         ======================================================== */}
+      {!isSimulatedCase19 && stageSummary && (
+        (stageSummary.busca?.length > 0 || stageSummary.teme?.length > 0 || stageSummary.protege?.length > 0 || stageSummary.produce?.length > 0)
+      ) && (
+        <div className="bg-[#141414] border border-[#C9A84C]/30 rounded-3xl p-6 sm:p-7 shadow-xl space-y-4">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-mono uppercase tracking-[0.2em] font-bold text-[#C9A84C] bg-[#C9A84C]/10 px-2.5 py-0.5 rounded-full border border-[#C9A84C]/25">
+              Tus Respuestas
+            </span>
+            <h3 className="text-white font-bold text-base sm:text-lg font-sans">
+              Lo que compartiste
+            </h3>
+          </div>
+
+          <div className="divide-y divide-white/10 text-sm">
+            {stageSummary.busca && stageSummary.busca.length > 0 && (
+              <div className="py-3.5 flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-4">
+                <span className="text-[#C9A84C] font-mono text-xs uppercase tracking-wider font-semibold sm:w-48 flex-shrink-0">
+                  Lo que buscas
+                </span>
+                <span className="text-white/90 font-sans font-medium">
+                  {stageSummary.busca.join(", ")}
+                </span>
+              </div>
+            )}
+            {stageSummary.teme && stageSummary.teme.length > 0 && (
+              <div className="py-3.5 flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-4">
+                <span className="text-[#C9A84C] font-mono text-xs uppercase tracking-wider font-semibold sm:w-48 flex-shrink-0">
+                  Lo que temes
+                </span>
+                <span className="text-white/90 font-sans font-medium">
+                  {stageSummary.teme.join(", ")}
+                </span>
+              </div>
+            )}
+            {stageSummary.protege && stageSummary.protege.length > 0 && (
+              <div className="py-3.5 flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-4">
+                <span className="text-[#C9A84C] font-mono text-xs uppercase tracking-wider font-semibold sm:w-48 flex-shrink-0">
+                  Cómo te proteges
+                </span>
+                <span className="text-white/90 font-sans font-medium">
+                  {stageSummary.protege.join(", ")}
+                </span>
+              </div>
+            )}
+            {stageSummary.produce && stageSummary.produce.length > 0 && (
+              <div className="py-3.5 flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-4">
+                <span className="text-[#C9A84C] font-mono text-xs uppercase tracking-wider font-semibold sm:w-48 flex-shrink-0">
+                  Dónde notas el desgaste
+                </span>
+                <span className="text-white/90 font-sans font-medium">
+                  {stageSummary.produce.join(", ")}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================
           PROMPT 19: SIMULADOR DE CASO DE PRUEBA (TEST HARNESS)
          ======================================================== */}
-      {onLoadCase19 && (
+      {showTestTools && onLoadCase19 && (
         <div className="bg-[#121212] border border-[#C9A84C]/30 rounded-3xl p-6 relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <span className="text-[9px] font-mono uppercase tracking-widest font-bold text-[#C9A84C] bg-[#C9A84C]/15 px-2 py-0.5 rounded border border-[#C9A84C]/30">
-                PROMPT 19 • Banco de Validación
+                Banco de Validación
               </span>
               {isSimulatedCase19 && (
                 <span className="text-[9px] font-mono font-bold text-emerald-400 bg-emerald-500/15 px-2 py-0.5 rounded border border-emerald-500/30">
@@ -180,7 +250,7 @@ export const HeartExplorationSection: React.FC<Props> = ({
             className="flex items-center gap-2 text-xs font-mono font-bold text-[#0D0D0D] bg-gradient-to-r from-[#C9A84C] to-yellow-500 hover:from-yellow-400 hover:to-amber-400 px-4 py-2.5 rounded-xl transition-all cursor-pointer shadow-lg flex-shrink-0"
           >
             <Sparkles className="w-4 h-4" />
-            {isSimulatedCase19 ? 'Recargar Caso Simulado' : 'Cargar Simulación Prompt 19'}
+            {isSimulatedCase19 ? 'Recargar Caso Simulado' : 'Cargar Caso Simulado'}
           </button>
         </div>
       )}
@@ -226,7 +296,7 @@ export const HeartExplorationSection: React.FC<Props> = ({
         <div className="space-y-3 relative z-10">
           <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-white/60 font-bold">
             <Layers className="w-4 h-4 text-[#C9A84C]" />
-            <span>Transición Pastoral de Preguntas (De la Etiqueta al Discernimiento)</span>
+            <span>De la etiqueta a la comprensión</span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

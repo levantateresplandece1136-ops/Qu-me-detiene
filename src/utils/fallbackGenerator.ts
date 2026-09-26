@@ -170,7 +170,13 @@ export function generateFallbackData(
   userName: string,
   _userEmail: string,
   activeBeliefs: UserResult[],
-  screeningAnswers?: Record<string, number>
+  screeningAnswers?: Record<string, number>,
+  stageSummary?: {
+    busca?: string[];
+    teme?: string[];
+    protege?: string[];
+    produce?: string[];
+  }
 ): AIDiagnosis {
   const blockId = primary.bloqueId || "capacidad-identidad";
   const name = userName?.trim() || "Hermano/a";
@@ -1007,6 +1013,28 @@ export function generateFallbackData(
           justificacion: "Hipótesis sobre las consecuencias para validar."
         }
       };
+
+  if (stageSummary) {
+    const formatStagePrefix = (labels?: string[]): string => {
+      if (!labels || labels.length === 0) return "";
+      const valid = labels.filter(l => l && l !== "Otra / no estoy seguro" && !l.toLowerCase().includes("no estoy seguro"));
+      if (valid.length === 0) return "";
+      if (valid.length === 1) {
+        return `Tú señalaste: «${valid[0]}». `;
+      }
+      return `Tú señalaste: «${valid.slice(0, -1).join("», «")}» y «${valid[valid.length - 1]}». `;
+    };
+
+    const deseoPrefix = formatStagePrefix(stageSummary.busca);
+    const temorPrefix = formatStagePrefix(stageSummary.teme);
+    const estrategiaPrefix = formatStagePrefix(stageSummary.protege);
+    const frutoPrefix = formatStagePrefix(stageSummary.produce);
+
+    if (deseoPrefix) mapaDelCorazon.deseo.contenido = deseoPrefix + mapaDelCorazon.deseo.contenido;
+    if (temorPrefix) mapaDelCorazon.temor.contenido = temorPrefix + mapaDelCorazon.temor.contenido;
+    if (estrategiaPrefix) mapaDelCorazon.estrategiaControl.contenido = estrategiaPrefix + mapaDelCorazon.estrategiaControl.contenido;
+    if (frutoPrefix) mapaDelCorazon.fruto.contenido = frutoPrefix + mapaDelCorazon.fruto.contenido;
+  }
 
   const scoresMap: Record<string, number> = {};
   if (screeningAnswers) {

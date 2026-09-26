@@ -1,13 +1,47 @@
 import { jsPDF } from "jspdf";
 
+/**
+ * Sanitizes text for jsPDF using standard Helvetica.
+ * Strips emojis and unsupported Unicode symbols, converts arrows to ASCII,
+ * and preserves valid Latin-1 / Windows-1252 characters (accents, ñ, ¿, ¡, «, », —, •).
+ */
+export const sanitizePdfText = (text: any): string => {
+  if (text === null || text === undefined) return "";
+  let s = typeof text === "string" ? text : String(text);
+
+  // Replace arrow symbols with clean ASCII equivalents
+  s = s.replace(/↔/g, "<->").replace(/→/g, "->").replace(/←/g, "<-");
+
+  // Remove emojis and miscellaneous pictographic symbols
+  s = s.replace(/[\u{1F000}-\u{1FAFF}]|[\u{2600}-\u{27BF}]|[\u{FE00}-\u{FE0F}]|[\u{1F900}-\u{1F9FF}]|[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{200D}]|[\u{20E3}]|[\u{E0020}-\u{E007F}]/gu, "");
+
+  // Remove any character outside standard ASCII and Windows-1252 / Latin-1 ranges
+  // Preserves: \r, \n, \t, space to ~, \xA0 to \xFF, plus en-dash, em-dash, curly quotes, and bullet •
+  s = s.replace(/[^\r\n\t\x20-\x7E\xA0-\xFF\u2013\u2014\u2018\u2019\u201C\u201D\u2022]/g, "");
+
+  // Clean leading spaces and multiple whitespace left behind by removed symbols
+  s = s.replace(/^[ \t]+/, "").replace(/[ \t]{2,}/g, " ");
+
+  return s;
+};
+
 export const downloadPDFResults = (
   userName: string,
   userEmail: string,
   aiDiagnosis: any,
   results: any[],
-  journalNotes: Record<string | number, string>,
-  interactionConfidenceLevels?: Record<string, string>
+  _journalNotes: Record<string | number, string>,
+  interactionConfidenceLevels?: Record<string, string>,
+  stageSummary?: {
+    busca?: string[];
+    teme?: string[];
+    protege?: string[];
+    produce?: string[];
+  },
+  localInteractions?: any[],
+  rejectedIds?: Record<string, boolean>
 ) => {
+  const interactionsToPrint: any[] = localInteractions ? localInteractions : (aiDiagnosis?.interacciones || []);
   const doc = new jsPDF({
     orientation: "portrait",
     unit: "mm",
@@ -25,7 +59,7 @@ export const downloadPDFResults = (
     doc.setFont("Helvetica", "normal");
     doc.setFontSize(8);
     doc.setTextColor(150, 150, 150);
-    doc.text("TRANSFORMACIÓN INTERIOR • PROGRAMA DE RENOVACIÓN MENTAL", margin, margin - 10);
+    doc.text(sanitizePdfText("TRANSFORMACIÓN INTERIOR • PROGRAMA DE RENOVACIÓN MENTAL"), margin, margin - 10);
     doc.setDrawColor(201, 168, 76); // Gold accent color
     doc.setLineWidth(0.3);
     doc.line(margin, margin - 7, pageWidth - margin, margin - 7);
@@ -38,8 +72,8 @@ export const downloadPDFResults = (
     doc.setDrawColor(220, 220, 220);
     doc.setLineWidth(0.1);
     doc.line(margin, pageHeight - 15, pageWidth - margin, pageHeight - 15);
-    doc.text(`Participante: ${userName}  |  Ministerio Levántate Resplandece`, margin, pageHeight - 10);
-    doc.text(`Página ${pageNum}`, pageWidth - margin - 15, pageHeight - 10);
+    doc.text(sanitizePdfText(`Participante: ${userName}  |  Ministerio Levántate Resplandece`), margin, pageHeight - 10);
+    doc.text(sanitizePdfText(`Página ${pageNum}`), pageWidth - margin - 15, pageHeight - 10);
   };
 
   const checkNewPage = (neededHeight: number) => {
@@ -63,31 +97,31 @@ export const downloadPDFResults = (
     doc.setFont("Helvetica", "bold");
     doc.setFontSize(22);
     doc.setTextColor(20, 20, 20);
-    doc.text("Transformación Interior", margin + 10, y);
+    doc.text(sanitizePdfText("Transformación Interior"), margin + 10, y);
     
     y += 10;
     doc.setFont("Helvetica", "italic");
     doc.setFontSize(10);
     doc.setTextColor(201, 168, 76); // Gold color
-    doc.text('"Transformaos por medio de la renovación de vuestro entendimiento" - Romanos 12:2', margin + 10, y, { maxWidth: maxWidth - 20 });
+    doc.text(sanitizePdfText('"Transformaos por medio de la renovación de vuestro entendimiento" - Romanos 12:2'), margin + 10, y, { maxWidth: maxWidth - 20 });
 
     y += 20;
     doc.setFont("Helvetica", "bold");
     doc.setFontSize(14);
     doc.setTextColor(30, 41, 59);
-    doc.text("HISTORIAL DE TRANSFORMACIÓN PERSONAL", margin + 10, y);
+    doc.text(sanitizePdfText("HISTORIAL DE TRANSFORMACIÓN PERSONAL"), margin + 10, y);
 
     y += 12;
     doc.setFont("Helvetica", "normal");
     doc.setFontSize(10);
     doc.setTextColor(80, 80, 80);
-    doc.text(`Participante: ${userName}`, margin + 10, y);
+    doc.text(sanitizePdfText(`Participante: ${userName}`), margin + 10, y);
     y += 6;
-    doc.text(`Correo Registrado: ${userEmail || "No provisto"}`, margin + 10, y);
+    doc.text(sanitizePdfText(`Correo Registrado: ${userEmail || "No provisto"}`), margin + 10, y);
     y += 6;
-    doc.text(`Fecha de Diagnóstico: ${new Date().toLocaleDateString('es-ES')}`, margin + 10, y);
+    doc.text(sanitizePdfText(`Fecha de Diagnóstico: ${new Date().toLocaleDateString('es-ES')}`), margin + 10, y);
     y += 6;
-    doc.text(`Metodología: Consejería Bíblica y Pastoral Cristocéntrica (Levántate Resplandece)`, margin + 10, y, { maxWidth: maxWidth - 20 });
+    doc.text(sanitizePdfText("Metodología: Consejería Bíblica y Pastoral Cristocéntrica (Levántate Resplandece)"), margin + 10, y, { maxWidth: maxWidth - 20 });
 
     y += 15;
     // Advertencia de seguridad clínica en portada
@@ -98,19 +132,19 @@ export const downloadPDFResults = (
     doc.setFont("Helvetica", "bold");
     doc.setFontSize(7.5);
     doc.setTextColor(180, 83, 9);
-    doc.text("AVISO ÉTICO Y SEGURIDAD CLÍNICA:", margin + 8, y + 5);
+    doc.text(sanitizePdfText("AVISO ÉTICO Y SEGURIDAD CLÍNICA:"), margin + 8, y + 5);
     doc.setFont("Helvetica", "normal");
     doc.setFontSize(7);
     doc.setTextColor(60, 60, 60);
     const disclaimer = "Esta herramienta formativa no constituye diagnóstico clínico y no sustituye evaluación psicológica o psiquiátrica profesional. Ante ideación suicida, autolesiones, violencia o crisis agudas, derive de inmediato a servicios médicos o líneas de emergencia especializadas.";
-    doc.text(doc.splitTextToSize(disclaimer, maxWidth - 16), margin + 8, y + 10);
+    doc.text(doc.splitTextToSize(sanitizePdfText(disclaimer), maxWidth - 16), margin + 8, y + 10);
 
     y += 28;
     doc.setFont("Helvetica", "normal");
     doc.setFontSize(9);
     doc.setTextColor(100, 100, 100);
     const introText = "Este documento representa el Mapa de Exploración del Corazón y el itinerario de acompañamiento pastoral. Contiene datos observables, hipótesis no deterministas para explorar, la pregunta central de sesión, la dirección bíblica en 4 movimientos y las prácticas de fidelidad.";
-    doc.text(introText, margin + 10, y, { maxWidth: maxWidth - 20 });
+    doc.text(doc.splitTextToSize(sanitizePdfText(introText), maxWidth - 20), margin + 10, y);
 
     y += 30;
     doc.setDrawColor(201, 168, 76);
@@ -120,7 +154,7 @@ export const downloadPDFResults = (
     doc.setFont("Helvetica", "bold");
     doc.setFontSize(10);
     doc.setTextColor(50, 50, 50);
-    doc.text("Ministerio Levántate Resplandece", margin + 10, y);
+    doc.text(sanitizePdfText("Ministerio Levántate Resplandece"), margin + 10, y);
 
     drawFooter();
     doc.addPage();
@@ -132,12 +166,14 @@ export const downloadPDFResults = (
   drawTitle();
 
   const writeHeading = (text: string) => {
+    const cleanText = sanitizePdfText(text);
+    if (!cleanText) return;
     checkNewPage(18);
     y += 6;
     doc.setFont("Helvetica", "bold");
     doc.setFontSize(12);
     doc.setTextColor(175, 142, 45); // Darker gold for readability
-    doc.text(text, margin, y);
+    doc.text(cleanText, margin, y);
     y += 2;
     doc.setDrawColor(201, 168, 76);
     doc.setLineWidth(0.4);
@@ -146,14 +182,17 @@ export const downloadPDFResults = (
   };
 
   const writeKeyValue = (label: string, value: string) => {
-    const wrappedValue = doc.splitTextToSize(value || "N/A", maxWidth - 35);
+    const cleanLabel = sanitizePdfText(label);
+    const cleanValue = sanitizePdfText(value);
+    if (!cleanValue || cleanValue.trim() === "" || cleanValue === "No provisto") return;
+    const wrappedValue = doc.splitTextToSize(cleanValue, maxWidth - 35);
     const neededHeight = (wrappedValue.length * 5) + 6;
     checkNewPage(neededHeight);
     
     doc.setFont("Helvetica", "bold");
     doc.setFontSize(9);
     doc.setTextColor(40, 40, 40);
-    doc.text(`• ${label}:`, margin, y);
+    doc.text(`• ${cleanLabel}:`, margin, y);
     
     doc.setFont("Helvetica", "normal");
     doc.setTextColor(70, 70, 70);
@@ -162,7 +201,10 @@ export const downloadPDFResults = (
   };
 
   const writeTextBlock = (title: string, text: string, isAlert = false) => {
-    const wrappedText = doc.splitTextToSize(text || "No provisto", maxWidth - 16);
+    const cleanTitle = sanitizePdfText(title);
+    const cleanText = sanitizePdfText(text);
+    if (!cleanText || cleanText.trim() === "" || cleanText === "No provisto") return;
+    const wrappedText = doc.splitTextToSize(cleanText, maxWidth - 16);
     const neededHeight = (wrappedText.length * 5) + 15;
     checkNewPage(neededHeight);
 
@@ -176,7 +218,7 @@ export const downloadPDFResults = (
     doc.setFont("Helvetica", "bold");
     doc.setFontSize(9.5);
     doc.setTextColor(isAlert ? 153 : 133, isAlert ? 27 : 97, isAlert ? 27 : 33);
-    doc.text(title, margin + 5, y);
+    doc.text(cleanTitle, margin + 5, y);
     
     y += 5;
     doc.setFont("Helvetica", "normal");
@@ -186,7 +228,7 @@ export const downloadPDFResults = (
   };
 
   // SECTION 1
-  writeHeading("PRINCIPIO FUNDAMENTAL DEL SISTEMA (PROMPT 20)");
+  writeHeading("PRINCIPIO FUNDAMENTAL");
   writeTextBlock(
     "REGLA PASTORAL DE ORO • MAPA DE COMPRENSIÓN, NO ETIQUETA",
     "«La herramienta no pretende decirle al consejero quién es la persona. Pretende ayudarle a hacer mejores preguntas para comprender cómo esa persona está interpretando sus circunstancias, qué está buscando, qué teme, cómo responde y dónde necesita ser redirigida hacia la verdad de Dios y la suficiencia de Cristo.»\n\n• Meta del sistema: La meta no es producir una etiqueta; es producir un mapa de comprensión y una dirección de ayuda.\n• Dejar atrás: «¿Qué diagnóstico tiene esta persona?» (etiquetas estáticas).\n• Comprensión bíblica: «¿Qué está pasando en esta persona y cómo puedo ayudarla bíblicamente?»\n• Fidelidad en Cristo: «¿Cómo puede esta persona aprender a responder con fe y fidelidad a Dios en sus circunstancias concretas?»",
@@ -197,30 +239,34 @@ export const downloadPDFResults = (
   
   if (aiDiagnosis?.exploratorio) {
     const exp = aiDiagnosis.exploratorio;
-    writeTextBlock("1. DATO OBSERVABLE REPORTADO", exp.dato.descripcion, false);
-    writeTextBlock("2. PATRÓN CONDUCTUAL OBSERVABLE", exp.patron.observacion, false);
+    writeTextBlock("1. DATO OBSERVABLE REPORTADO", exp.dato?.descripcion, false);
+    writeTextBlock("2. PATRÓN CONDUCTUAL OBSERVABLE", exp.patron?.observacion, false);
 
-    checkNewPage(35);
-    doc.setFont("Helvetica", "bold");
-    doc.setFontSize(10);
-    doc.setTextColor(40, 40, 40);
-    doc.text("3. HIPÓTESIS DE TRABAJO (A DISCERNIR, NO ETIQUETAS FIJAS):", margin, y);
-    y += 6;
-    exp.hipotesis.forEach((h: any) => {
-      writeKeyValue(h.titulo, h.descripcion);
-    });
+    if (exp.hipotesis && exp.hipotesis.length > 0) {
+      checkNewPage(35);
+      doc.setFont("Helvetica", "bold");
+      doc.setFontSize(10);
+      doc.setTextColor(40, 40, 40);
+      doc.text(sanitizePdfText("3. HIPÓTESIS DE TRABAJO (A DISCERNIR, NO ETIQUETAS FIJAS):"), margin, y);
+      y += 6;
+      exp.hipotesis.forEach((h: any) => {
+        writeKeyValue(h.titulo, h.descripcion);
+      });
+    }
 
-    checkNewPage(30);
-    doc.setFont("Helvetica", "bold");
-    doc.setFontSize(10);
-    doc.setTextColor(40, 40, 40);
-    doc.text("4. PREGUNTAS PARA EXPLORAR EN ORACIÓN Y CONSEJERÍA:", margin, y);
-    y += 6;
-    exp.preguntasPorExplorar.forEach((p: string, idx: number) => {
-      writeKeyValue(`Pregunta ${idx + 1}`, p);
-    });
+    if (exp.preguntasPorExplorar && exp.preguntasPorExplorar.length > 0) {
+      checkNewPage(30);
+      doc.setFont("Helvetica", "bold");
+      doc.setFontSize(10);
+      doc.setTextColor(40, 40, 40);
+      doc.text(sanitizePdfText("4. PREGUNTAS PARA EXPLORAR EN ORACIÓN Y CONSEJERÍA:"), margin, y);
+      y += 6;
+      exp.preguntasPorExplorar.forEach((p: string, idx: number) => {
+        writeKeyValue(`Pregunta ${idx + 1}`, p);
+      });
+    }
 
-    writeTextBlock("5. DIRECCIÓN DE AYUDA Y GRACIA", exp.direccionDeAyuda.enfoque, false);
+    writeTextBlock("5. DIRECCIÓN DE AYUDA Y GRACIA", exp.direccionDeAyuda?.enfoque, false);
   } else {
     const primaryPatternText = aiDiagnosis?.fase1?.principalBelief || (results && (results[0]?.afirmacionTest ? `Posible patrón a contrastar: «${results[0].afirmacionTest}»` : (results[0]?.alias || results[0]?.creencia)));
     writeKeyValue("Patrón Principal", primaryPatternText);
@@ -230,26 +276,81 @@ export const downloadPDFResults = (
     
     y += 2;
     writeTextBlock(
-      "❌ HIPÓTESIS DE CREENCIA A CONTRASTAR", 
+      "HIPÓTESIS DE CREENCIA A CONTRASTAR", 
       aiDiagnosis?.fase2?.rootLie || 'Mi valía y seguridad dependen de mi propio control.',
       true
     );
     writeTextBlock(
-      "💬 TENDENCIA OBSERVABLE DE FRENO INVOLUNTARIO",
+      "TENDENCIA OBSERVABLE DE FRENO INVOLUNTARIO",
       aiDiagnosis?.fase2?.selfSabotageMechanism || 'Postergación o hipervigilancia excesiva.',
       false
     );
   }
 
+  // SECCIÓN: LO QUE COMPARTISTE (ETAPAS 03–06)
+  const hasStageData = Boolean(
+    stageSummary &&
+    ((stageSummary.busca && stageSummary.busca.length > 0) ||
+     (stageSummary.teme && stageSummary.teme.length > 0) ||
+     (stageSummary.protege && stageSummary.protege.length > 0) ||
+     (stageSummary.produce && stageSummary.produce.length > 0))
+  );
+
+  if (hasStageData && stageSummary) {
+    writeHeading("LO QUE COMPARTISTE");
+    const stageItems = [
+      { label: "Lo que buscas", values: stageSummary.busca },
+      { label: "Lo que temes", values: stageSummary.teme },
+      { label: "Cómo te proteges", values: stageSummary.protege },
+      { label: "Dónde notas el desgaste", values: stageSummary.produce }
+    ];
+
+    stageItems.forEach(({ label, values }) => {
+      if (!values || values.length === 0) return;
+      const cleanLabel = sanitizePdfText(label);
+      const cleanVal = sanitizePdfText(values.join(", "));
+      if (!cleanVal) return;
+
+      const prefix = `• ${cleanLabel}: `;
+      doc.setFont("Helvetica", "bold");
+      doc.setFontSize(9);
+      const prefixWidth = doc.getTextWidth(prefix);
+
+      const wrappedVal = doc.splitTextToSize(cleanVal, maxWidth - prefixWidth);
+      checkNewPage((wrappedVal.length * 5) + 4);
+
+      doc.setFont("Helvetica", "bold");
+      doc.setTextColor(40, 40, 40);
+      doc.text(prefix, margin, y);
+
+      doc.setFont("Helvetica", "normal");
+      doc.setTextColor(70, 70, 70);
+      doc.text(wrappedVal[0], margin + prefixWidth, y);
+
+      if (wrappedVal.length > 1) {
+        for (let i = 1; i < wrappedVal.length; i++) {
+          y += 4.5;
+          doc.text(wrappedVal[i], margin + 6, y);
+        }
+      }
+      y += 6;
+    });
+    y += 2;
+  }
+
   // MODELO DE ANÁLISIS DEL CORAZÓN (7 NIVELES)
   if (aiDiagnosis?.mapaDelCorazon) {
     const map = aiDiagnosis.mapaDelCorazon;
-    writeHeading("MODELO DE ANÁLISIS DEL CORAZÓN (DINÁMICA BÍBLICA: CIRCUNSTANCIA → FRUTO)");
+    writeHeading("MODELO DE ANÁLISIS DEL CORAZÓN (DINÁMICA BÍBLICA: CIRCUNSTANCIA -> FRUTO)");
 
-    const writeHeartStep = (label: string, text: string, type: 'sabemos' | 'explorar', detail: string) => {
+    const writeHeartStep = (label: string, text: string | undefined, type: 'sabemos' | 'explorar', detail: string) => {
+      const cleanText = sanitizePdfText(text);
+      if (!cleanText || cleanText.trim() === "" || cleanText === "No provisto") {
+        return; // Omit step if no content is provided
+      }
       const isKnown = type === 'sabemos';
       const badge = isKnown ? "[LO QUE SABEMOS - DATO REPORTADO]" : "[PROPUESTO PARA EXPLORAR - HIPÓTESIS]";
-      const wrappedText = doc.splitTextToSize(text || "No provisto", maxWidth - 16);
+      const wrappedText = doc.splitTextToSize(cleanText, maxWidth - 16);
       const neededHeight = (wrappedText.length * 5) + 16;
       checkNewPage(neededHeight);
 
@@ -262,7 +363,7 @@ export const downloadPDFResults = (
       doc.setFont("Helvetica", "bold");
       doc.setFontSize(8.5);
       doc.setTextColor(isKnown ? 21 : 133, isKnown ? 128 : 97, isKnown ? 61 : 33);
-      doc.text(`${label} • ${badge}`, margin + 5, y);
+      doc.text(sanitizePdfText(`${label} • ${badge}`), margin + 5, y);
 
       y += 4.5;
       doc.setFont("Helvetica", "bold");
@@ -274,7 +375,7 @@ export const downloadPDFResults = (
       doc.setFont("Helvetica", "italic");
       doc.setFontSize(7.5);
       doc.setTextColor(120, 120, 120);
-      doc.text(detail, margin + 5, y);
+      doc.text(sanitizePdfText(detail), margin + 5, y);
       y += 6;
     };
 
@@ -288,15 +389,15 @@ export const downloadPDFResults = (
   }
 
   // Cross-block interactions
-  if (aiDiagnosis?.interacciones && aiDiagnosis.interacciones.length > 0) {
+  if (interactionsToPrint.length > 0) {
     checkNewPage(45);
     doc.setFont("Helvetica", "bold");
     doc.setFontSize(10);
     doc.setTextColor(201, 168, 76);
-    doc.text("🔗 INTERACCIONES DETECTADAS ENTRE BLOQUES (HIPÓTESIS DE TRABAJO):", margin, y);
+    doc.text(sanitizePdfText("INTERACCIONES DETECTADAS ENTRE BLOQUES (HIPÓTESIS DE TRABAJO):"), margin, y);
     y += 6;
 
-    aiDiagnosis.interacciones.forEach((inter) => {
+    interactionsToPrint.forEach((inter: any) => {
       checkNewPage(32);
       doc.setFillColor(250, 248, 240);
       doc.setDrawColor(201, 168, 76);
@@ -304,22 +405,25 @@ export const downloadPDFResults = (
 
       const signalPrefix = inter.nivel === 'senal' ? '(A explorar) ' : '';
       const confLevel = interactionConfidenceLevels?.[inter.id];
-      const confSuffix = confLevel ? ` — Confianza: ${confLevel}` : '';
+      const confSuffix = confLevel ? ` - Confianza: ${confLevel}` : '';
+      const rejectedSuffix = rejectedIds?.[inter.id] ? ' - No te identificaste' : '';
+      const interTitle = sanitizePdfText(`${signalPrefix}[${inter.blockA?.name || ''} ${inter.blockA?.score || 1}/5] <-> [${inter.blockB?.name || ''} ${inter.blockB?.score || 1}/5] - ${inter.tag || ''}${confSuffix}${rejectedSuffix}`);
+      
       doc.setFont("Helvetica", "bold");
       doc.setFontSize(8.5);
       doc.setTextColor(40, 40, 40);
-      doc.text(`${signalPrefix}[${inter.blockA.name} ${inter.blockA.score}/5]  ↔  [${inter.blockB.name} ${inter.blockB.score}/5]  —  ${inter.tag}${confSuffix}`, margin + 4, y + 5);
+      doc.text(interTitle, margin + 4, y + 5);
 
       doc.setFont("Helvetica", "normal");
       doc.setFontSize(8);
       doc.setTextColor(60, 60, 60);
-      const splitHyp = doc.splitTextToSize(inter.hipotesis, maxWidth - 8);
+      const splitHyp = doc.splitTextToSize(sanitizePdfText(inter.hipotesis), maxWidth - 8);
       doc.text(splitHyp.slice(0, 2), margin + 4, y + 10);
 
       doc.setFont("Helvetica", "italic");
       doc.setFontSize(7.5);
       doc.setTextColor(120, 100, 60);
-      const splitQ = doc.splitTextToSize(`Pregunta clave: ${inter.preguntaClave}`, maxWidth - 8);
+      const splitQ = doc.splitTextToSize(sanitizePdfText(`Pregunta clave: ${inter.preguntaClave}`), maxWidth - 8);
       doc.text(splitQ[0] || "", margin + 4, y + 20);
 
       y += 28;
@@ -331,7 +435,7 @@ export const downloadPDFResults = (
   doc.setFont("Helvetica", "bold");
   doc.setFontSize(10);
   doc.setTextColor(40, 40, 40);
-  doc.text("🔍 COSTOS ESTIMADOS EN TU COGNICIÓN (LAS 4 DIMENSIONES):", margin, y);
+  doc.text(sanitizePdfText("COSTOS ESTIMADOS EN TU COGNICIÓN (LAS 4 DIMENSIONES):"), margin, y);
   y += 6;
   writeKeyValue("En Decisiones", aiDiagnosis?.fase2?.currentCost?.decisions || "Parálisis cerebral o rumiación antes de firmar compromisos.");
   writeKeyValue("En Emociones", aiDiagnosis?.fase2?.currentCost?.emotions || "Carga simpática de angustia y culpa constante al descansar.");
@@ -341,12 +445,12 @@ export const downloadPDFResults = (
   // SECTION 2
   writeHeading("FASE 3 Y 4: RENOVACIÓN BÍBLICA Y NUEVA IDENTIDAD CRISTOCÉNTRICA");
   writeTextBlock(
-    "🛑 LA MENTIRA CARNAL ENFRENTADA DE FRENTE",
+    "LA MENTIRA CARNAL ENFRENTADA DE FRENTE",
     aiDiagnosis?.fase3?.mentira || (results && results[0]?.afirmacionTest),
     true
   );
   writeTextBlock(
-    "🟢 LA VERDAD ETERNA SUSTITUTORIA DE REENCUADRE",
+    "LA VERDAD ETERNA SUSTITUTORIA DE REENCUADRE",
     aiDiagnosis?.fase3?.verdadBiblica || (results && results[0]?.verdad),
     false
   );
@@ -355,10 +459,11 @@ export const downloadPDFResults = (
   doc.setFont("Helvetica", "bold");
   doc.setFontSize(10);
   doc.setTextColor(30, 41, 59);
-  doc.text("📖 VERSÍCULO ANCLERO DE LA AUTOPISTA NUEVA:", margin, y);
+  doc.text(sanitizePdfText("VERSÍCULO ANCLERO DE LA AUTOPISTA NUEVA:"), margin, y);
   y += 5;
-  const verseText = `"${aiDiagnosis?.fase3?.versiculo?.texto || (results && results[0]?.versiculos && results[0]?.versiculos[0]?.txt) || ''}"`;
-  const wrappedVerse = doc.splitTextToSize(verseText, maxWidth - 10);
+  const rawVerse = aiDiagnosis?.fase3?.versiculo?.texto || (results && results[0]?.versiculos && results[0]?.versiculos[0]?.txt) || '';
+  const verseText = rawVerse ? `"${rawVerse}"` : '';
+  const wrappedVerse = doc.splitTextToSize(sanitizePdfText(verseText), maxWidth - 10);
   doc.setFont("Helvetica", "italic");
   doc.setFontSize(9.5);
   doc.setTextColor(70, 70, 70);
@@ -367,11 +472,12 @@ export const downloadPDFResults = (
   doc.setFont("Helvetica", "bold");
   doc.setFontSize(8.5);
   doc.setTextColor(201, 168, 76);
-  doc.text(`— Cita: ${aiDiagnosis?.fase3?.versiculo?.referencia || (results && results[0]?.versiculos && results[0]?.versiculos[0]?.ref) || ''}`, margin + 5, y);
+  const refText = aiDiagnosis?.fase3?.versiculo?.referencia || (results && results[0]?.versiculos && results[0]?.versiculos[0]?.ref) || '';
+  doc.text(sanitizePdfText(`- Cita: ${refText}`), margin + 5, y);
   y += 8;
 
   writeTextBlock(
-    "✨ PRINCIPAL CONFESIÓN DE NUEVA IDENTIDAD (Decir con voz firme diariamente)",
+    "PRINCIPAL CONFESIÓN DE NUEVA IDENTIDAD (Decir con voz firme diariamente)",
     aiDiagnosis?.fase4?.declaracionIdentidad || (results && results[0]?.declaracion),
     false
   );
@@ -392,16 +498,16 @@ export const downloadPDFResults = (
       doc.setFont("Helvetica", "bold");
       doc.setFontSize(8.5);
       doc.setTextColor(180, 130, 20);
-      doc.text("PREGUNTA CENTRAL DE SESIÓN (PROMPT 13):", margin + 4, y + 5);
+      doc.text(sanitizePdfText("PREGUNTA CENTRAL DE SESIÓN:"), margin + 4, y + 5);
       doc.setFont("Helvetica", "italic");
       doc.setFontSize(9);
       doc.setTextColor(30, 30, 30);
-      const splitCQ = doc.splitTextToSize(`"${centralQ.pregunta}"`, maxWidth - 8);
+      const splitCQ = doc.splitTextToSize(sanitizePdfText(`"${centralQ.pregunta}"`), maxWidth - 8);
       doc.text(splitCQ, margin + 4, y + 10);
       doc.setFont("Helvetica", "normal");
       doc.setFontSize(7.5);
       doc.setTextColor(100, 100, 100);
-      doc.text(`Enfoque pastoral: ${centralQ.enfoquePastoral || ''}`, margin + 4, y + 19);
+      doc.text(sanitizePdfText(`Enfoque pastoral: ${centralQ.enfoquePastoral || ''}`), margin + 4, y + 19);
       y += 26;
     }
 
@@ -417,7 +523,7 @@ export const downloadPDFResults = (
       doc.setFont("Helvetica", "bold");
       doc.setFontSize(9);
       doc.setTextColor(160, 100, 20);
-      doc.text("LO QUE TODAVÍA NO SABEMOS (EXPLORACIÓN PERSONAL OBLIGATORIA):", margin, y);
+      doc.text(sanitizePdfText("LO QUE TODAVÍA NO SABEMOS (EXPLORACIÓN PERSONAL OBLIGATORIA):"), margin, y);
       y += 5;
       map.loQueTodaviaNecesitamosInvestigar.slice(0, 3).forEach((item: any) => {
         writeKeyValue("Por explorar", `${item.enunciado} (Pregunta: «${item.preguntaParaLaSesion}»)`);
@@ -428,8 +534,8 @@ export const downloadPDFResults = (
       const task = aiDiagnosis.behavioralTask || map?.proximoPaso;
       checkNewPage(30);
       writeTextBlock(
-        "🎯 TAREA DE CAMBIO CONDUCTUAL (VERDAD → FE → CONDUCTA)",
-        `${task.instruccionPrincipal}\n• Verdad: ${task.verdadTeologica}\n• Paso de Fe: ${task.pasoDeFe}\n• Conducta Concreta: ${task.conductaConcreta}`,
+        "TAREA DE CAMBIO CONDUCTUAL (VERDAD -> FE -> CONDUCTA)",
+        `${task.instruccionPrincipal || ''}\n• Verdad: ${task.verdadTeologica || ''}\n• Paso de Fe: ${task.pasoDeFe || ''}\n• Conducta Concreta: ${task.conductaConcreta || ''}`,
         false
       );
     }
@@ -446,7 +552,7 @@ export const downloadPDFResults = (
     doc.setFont("Helvetica", "bold");
     doc.setFontSize(9);
     doc.setTextColor(175, 142, 45);
-    doc.text(`SEMANA ${weekNum}: ${title}`, margin + 2, y + 4.5);
+    doc.text(sanitizePdfText(`SEMANA ${weekNum}: ${title}`), margin + 2, y + 4.5);
     y += 8;
 
     Object.entries(items).forEach(([k, v]) => {
@@ -499,24 +605,24 @@ export const downloadPDFResults = (
       doc.rect(margin, y, maxWidth, 28, "FD");
 
       doc.setFont("Helvetica", "bold").setFontSize(9.5).setTextColor(20, 20, 20);
-      doc.text(`DÍA ${day.dia}: ${day.enfoque.toUpperCase()}`, margin + 4, y + 4.5);
+      doc.text(sanitizePdfText(`DÍA ${day.dia}: ${(day.enfoque || '').toUpperCase()}`), margin + 4, y + 4.5);
 
       doc.setFont("Helvetica", "normal").setFontSize(8).setTextColor(80, 80, 80);
       
-      const dayVerse = `Pasaje: "${day.versiculo.texto}" (${day.versiculo.referencia})`;
-      const vText = doc.splitTextToSize(dayVerse, maxWidth - 8);
+      const dayVerse = `Pasaje: "${day.versiculo?.texto || ''}" (${day.versiculo?.referencia || ''})`;
+      const vText = doc.splitTextToSize(sanitizePdfText(dayVerse), maxWidth - 8);
       doc.text(vText, margin + 4, y + 9);
 
-      const actionText = `Práctica: ${day.accion}`;
-      const actText = doc.splitTextToSize(actionText, maxWidth - 8);
+      const actionText = `Práctica: ${day.accion || ''}`;
+      const actText = doc.splitTextToSize(sanitizePdfText(actionText), maxWidth - 8);
       doc.text(actText, margin + 4, y + 14);
 
-      const reflectionText = `Auto-Filtro: ${day.reflexion}`;
-      const rText = doc.splitTextToSize(reflectionText, maxWidth - 8);
+      const reflectionText = `Auto-Filtro: ${day.reflexion || ''}`;
+      const rText = doc.splitTextToSize(sanitizePdfText(reflectionText), maxWidth - 8);
       doc.text(rText, margin + 4, y + 19);
 
-      const prayerText = `Oración: "${day.oracion}"`;
-      const prText = doc.splitTextToSize(prayerText, maxWidth - 8);
+      const prayerText = `Oración: "${day.oracion || ''}"`;
+      const prText = doc.splitTextToSize(sanitizePdfText(prayerText), maxWidth - 8);
       doc.text(prText, margin + 4, y + 24);
 
       y += 31;
@@ -539,35 +645,10 @@ export const downloadPDFResults = (
 
   y += 3;
   writeTextBlock(
-    "✨ BENDICIÓN DE COMPROMISO PASTORAL DE CLAUSURA",
+    "BENDICIÓN DE COMPROMISO PASTORAL DE CLAUSURA",
     aiDiagnosis?.reporteFinal?.exhortacionBiblica || 'Por lo tanto, mantén firmemente la mirada fija en Jesús...',
     false
   );
-
-  y += 5;
-  checkNewPage(35);
-  doc.setFont("Helvetica", "bold");
-  doc.setFontSize(9.5);
-  doc.setTextColor(40, 40, 40);
-  doc.text("HISTORIAL DE VALORACIONES DE TU DIARIO DE ORACIÓN:", margin, y);
-  y += 6;
-  if (results && results.length > 0) {
-    results.forEach((r: any) => {
-      const note = journalNotes[r.id] || '(No guardaste notas de oración correspondientes en este casillero).';
-      const materiaText = r.afirmacionTest || r.alias || r.creencia;
-      const cellValue = `Materia: "${materiaText}" (${r.alias || r.bloque})\nDiario de Oración personal: "${note}"`;
-      const wrappedCell = doc.splitTextToSize(cellValue, maxWidth - 10);
-      checkNewPage((wrappedCell.length * 4.5) + 6);
-      
-      doc.setFont("Helvetica", "normal").setFontSize(8.5).setTextColor(70, 70, 70);
-      doc.text(wrappedCell, margin + 5, y);
-      y += (wrappedCell.length * 4.5) + 4;
-    });
-  } else {
-    doc.setFont("Helvetica", "italic").setFontSize(8.5).setTextColor(120, 120, 120);
-    doc.text("(Sin valoraciones pasadas de diario aún escritas)", margin + 5, y);
-    y += 6;
-  }
 
   // End of manual sign-off
   checkNewPage(30);
@@ -576,10 +657,10 @@ export const downloadPDFResults = (
   doc.line(margin, y, pageWidth - margin, y);
   y += 6;
   doc.setFont("Helvetica", "bold").setFontSize(8.5).setTextColor(80, 80, 80);
-  doc.text("Desarrollado con amor y cuidado pastoral por Levántate Resplandece • Transformación Interior", margin, y);
+  doc.text(sanitizePdfText("Desarrollado con amor y cuidado pastoral por Levántate Resplandece • Transformación Interior"), margin, y);
   y += 5;
   doc.setFont("Helvetica", "normal").setFontSize(7.5).setTextColor(120, 120, 120);
-  doc.text("Herramienta de autoexploración basada en principios de consejería bíblica. No es un diagnóstico clínico ni sustituye la atención profesional.", margin, y);
+  doc.text(sanitizePdfText("Herramienta de autoexploración basada en principios de consejería bíblica. No es un diagnóstico clínico ni sustituye la atención profesional."), margin, y);
 
   // Finalize document page count and draw header/footer on last page
   drawFooter();
