@@ -59,7 +59,7 @@ export interface UserResult extends CreenciaRecord {
   score?: number;
 }
 
-type Step = 'welcome' | 'screening' | 'calculating_blocks' | 'deep_dive' | 'heart_stages' | 'validation' | 'stage_transition' | 'generating_results' | 'results';
+type Step = 'welcome' | 'screening' | 'calculating_blocks' | 'deep_dive' | 'heart_stages' | 'validation' | 'stage_transition' | 'generating_results' | 'tiebreak' | 'results';
 
 // Evaluación pastoral para el monitoreo de renovación mental (Romanos 12:2)
 const getProgressEvaluation = (scores: Record<string, number>, name: string) => {
@@ -290,6 +290,26 @@ export default function App() {
     const saved = localStorage.getItem('ti_results');
     return saved ? JSON.parse(saved) : [];
   });
+
+  // Desempate de creencia principal (fix: "siempre sale la misma creencia").
+  // El puntaje compuesto (screening x 10 + intensidad 0-2) empata con mucha
+  // frecuencia porque la exploración profunda solo tiene 3 niveles; antes el
+  // desempate lo resolvía el orden estable del arreglo, es decir, siempre la
+  // primera creencia de la base de datos del bloque dominante. Cuando varias
+  // creencias empatan en el puntaje máximo, se le pregunta a la persona cuál
+  // le describe mejor en lugar de adivinarlo por orden de lista.
+  const [tiebreakCandidates, setTiebreakCandidates] = useState<UserResult[]>([]);
+  const [tiebreakBonusId, setTiebreakBonusId] = useState<number | null>(() => {
+    const saved = localStorage.getItem('ti_tiebreak_bonus_id');
+    return saved ? parseInt(saved, 10) : null;
+  });
+
+  const chooseTiebreakBelief = (beliefId: number) => {
+    setTiebreakBonusId(beliefId);
+    localStorage.setItem('ti_tiebreak_bonus_id', String(beliefId));
+    setTiebreakCandidates([]);
+    setStep('generating_results');
+  };
 
   // New robust states for the 8-phase AI transformation kit
   const [aiDiagnosis, setAiDiagnosis] = useState<AIDiagnosis | null>(() => {
@@ -1089,6 +1109,11 @@ export default function App() {
     setStageIndex(0);
     setResults([]);
     setIntroParagraph('');
+    setTiebreakCandidates([]);
+    setTiebreakBonusId(null);
+    setIsSimulatedCase19(false);
+    localStorage.removeItem('ti_tiebreak_bonus_id');
+    localStorage.removeItem('ti_is_simulated_case_19');
     setCompletedDays({});
     setJournalNotes({});
     setExpandedBelief(null);
@@ -1224,8 +1249,6 @@ export default function App() {
         const sortedBlocks = Object.entries(blockScores)
           .sort((a, b) => b[1] - a[1]);
         
-        const primaryBlockId = sortedBlocks[0]?.[0] || 'capacidad-identidad';
-        
         // Empathic, prudent, and biblically sound introductory paragraph
         const intros: Record<string, string> = {
           "capacidad-identidad": "Con el tiempo, tu mente aprendió a protegerse exigiendo una preparación exhaustiva por temor al rechazo o a no estar a la altura. Esa voz interior crítica nació para cuidarte ante la crítica, pero hoy te desgasta. La verdad bíblica es que tu suficiencia y competencia provienen de Dios, no de una perfección inalcanzable (2 Corintios 3:5).",
@@ -1239,8 +1262,6 @@ export default function App() {
           "genero-identidad-social": "Has sentido el peso de etiquetas familiares, sociales o de tu historia que intentaron poner un techo a lo que puedes alcanzar. En Cristo esas barreras pierden su poder: tu identidad y llamado provienen del Reino de Dios (Gálatas 3:28)."
         };
 
-        setIntroParagraph(intros[primaryBlockId] || intros["capacidad-identidad"]);
-        
         // Compile beliefs results
         const compiled: UserResult[] = [];
         creenciasDatabase.forEach(item => {
@@ -1266,13 +1287,53 @@ export default function App() {
           });
         }
 
-        // CRITICAL FIX: Sort beliefs by composite weight: (screeningScore * 10) + deepDiveIntensity
-        // This ensures the primary belief matches the user's highest screening block(s)!
-        compiled.sort((a, b) => {
-          const scoreA = (screeningAnswers[a.bloqueId] || 1) * 10 + a.intensity;
-          const scoreB = (screeningAnswers[b.bloqueId] || 1) * 10 + b.intensity;
-          return scoreB - scoreA;
-        });
+        // Puntaje compuesto: (screening del bloque x 10) + intensidad de la
+        // exploración profunda (1 = a veces, 2 = prácticamente sí).
+        const beliefScore = (b: UserResult) =>
+          (screeningAnswers[b.bloqueId] || 1) * 10 + (b.intensity || 1);
+
+        compiled.sort((a, b) => beliefScore(b) - beliefScore(a));
+
+        // FIX "siempre la misma creencia": con solo 3 niveles de intensidad,
+        // varias creencias empatan en el puntaje máximo y el orden estable del
+        // arreglo elegía siempre la primera de la base de datos. Si hay
+        // empate en la cima, no se adivina: se le pregunta a la persona.
+        const maxScore = compiled.length > 0 ? beliefScore(compiled[0]) : 0;
+        const tiedAtTop = compiled.filter(b => beliefScore(b) === maxScore);
+        const bonusIsValid =
+          tiebreakBonusId !== null && tiedAtTop.some(b => b.id === tiebreakBonusId);
+        if (tiedAtTop.length > 1 && !bonusIsValid) {
+          // Hasta 6 candidatas, con diversidad de bloques: primero una por
+          // bloque distinto y luego se completa con las siguientes empatadas.
+          // Así, con un empate entre los 9 bloques, la persona puede elegir
+          // una creencia de otro bloque y no solo las 3 primeras de la lista.
+          const diverseTied: UserResult[] = [];
+          const seenBlocks = new Set<string>();
+          for (const b of tiedAtTop) {
+            if (diverseTied.length < 3 && !seenBlocks.has(b.bloqueId)) {
+              diverseTied.push(b);
+              seenBlocks.add(b.bloqueId);
+            }
+          }
+          for (const b of tiedAtTop) {
+            if (diverseTied.length >= 6) break;
+            if (!diverseTied.includes(b)) diverseTied.push(b);
+          }
+          setTiebreakCandidates(diverseTied);
+          setStep('tiebreak');
+          return;
+        }
+        if (bonusIsValid) {
+          compiled.sort((a, b) =>
+            (b.id === tiebreakBonusId ? 1 : 0) - (a.id === tiebreakBonusId ? 1 : 0) ||
+            beliefScore(b) - beliefScore(a)
+          );
+        }
+
+        // La introducción empática sigue a la creencia principal elegida,
+        // no al primer bloque empatado del screening.
+        const primaryBlockId = compiled[0]?.bloqueId || sortedBlocks[0]?.[0] || 'capacidad-identidad';
+        setIntroParagraph(intros[primaryBlockId] || intros["capacidad-identidad"]);
 
         setResults(compiled);
 
@@ -1385,14 +1446,30 @@ export default function App() {
     return sortedBlocksWithScores.filter(b => b.score === maxScore);
   }, [sortedBlocksWithScores]);
 
+  // El bloque principal sigue a la creencia principal elegida (results[0]),
+  // no al primer bloque empatado del screening: antes, con un empate en el
+  // screening, la introducción, la guía práctica y el plan siempre eran de
+  // Capacidad e Identidad aunque la creencia detectada fuera de otro bloque.
   const primaryBlock = useMemo(() => {
+    if (results.length > 0) {
+      const chosen = results[0];
+      const info = (bloquesDiagnostico as any)[chosen.bloqueId];
+      if (info) {
+        return {
+          id: chosen.bloqueId,
+          title: info.title,
+          shortTitle: info.shortTitle,
+          score: screeningAnswers[chosen.bloqueId] || 1
+        };
+      }
+    }
     return dominantBlocks[0] || sortedBlocksWithScores[0] || {
       id: 'capacidad-identidad',
       title: 'Capacidad e Identidad',
       shortTitle: 'Capacidad',
       score: 1
     };
-  }, [dominantBlocks, sortedBlocksWithScores]);
+  }, [dominantBlocks, sortedBlocksWithScores, results, screeningAnswers]);
 
   // Nivel de confianza calculado para cada interacción según los 6 factores metodológicos
   const interactionConfidence = useMemo(() => {
@@ -2576,6 +2653,62 @@ export default function App() {
               </motion.div>
             )}
 
+            {/* PASO DE DESEMPATE: varias creencias empataron en el puntaje máximo.
+                La app no elige por orden de lista: la persona elige cuál le describe mejor. */}
+            {step === 'tiebreak' && (
+              <motion.div
+                key="tiebreak-pane"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="max-w-2xl mx-auto py-10 space-y-6"
+              >
+                <div className="text-center space-y-3">
+                  <span className="text-[#C9A84C] font-mono text-xs uppercase tracking-[0.2em] font-semibold block">
+                    Última pregunta antes de tu resultado
+                  </span>
+                  <h3 className="text-2xl sm:text-3xl font-bold font-display text-white">
+                    Varias creencias resonaron con la misma fuerza
+                  </h3>
+                  <p className="text-white/60 text-sm leading-relaxed max-w-lg mx-auto">
+                    Tus respuestas apuntan con igual intensidad a más de una creencia.
+                    Para que tu resultado sea realmente tuyo, dime cuál de estas
+                    afirmaciones te describe mejor hoy:
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  {tiebreakCandidates.map((candidate) => (
+                    <button
+                      key={candidate.id}
+                      onClick={() => chooseTiebreakBelief(candidate.id)}
+                      className="w-full text-left bg-[#161616] hover:bg-[#1E1E1E] border border-white/10 hover:border-[#C9A84C]/50 p-5 rounded-2xl transition-all cursor-pointer space-y-2"
+                    >
+                      <span className="text-[10px] font-mono uppercase tracking-widest text-[#C9A84C] font-bold block">
+                        {candidate.alias} · {candidate.bloque}
+                      </span>
+                      <span className="text-white font-bold text-sm block">{candidate.creencia}</span>
+                      <span className="text-white/60 text-sm italic leading-relaxed block">
+                        “{candidate.afirmacionTest}”
+                      </span>
+                      <span className="text-[#C9A84C] text-xs font-bold block pt-1">
+                        Esta es la que más me describe →
+                      </span>
+                    </button>
+                  ))}
+                </div>
+
+                <div className="text-center">
+                  <button
+                    onClick={() => tiebreakCandidates.length > 0 && chooseTiebreakBelief(tiebreakCandidates[0].id)}
+                    className="text-[11px] text-white/40 hover:text-white/70 underline cursor-pointer"
+                  >
+                    No estoy seguro/a, elige por mí
+                  </button>
+                </div>
+              </motion.div>
+            )}
+
             {/* STEP 6: CLINICAL & DEVOTIONAL RESULTS DETAILED */}
             {step === 'results' && !isUnveiled && (
               <motion.div
@@ -3739,6 +3872,81 @@ export default function App() {
                               </span>
                             </div>
                           ))}
+                        </div>
+                      </div>
+
+                      {/* PLAN PARA ROMPER ESTA CREENCIA Y VIVIR REDIMIDO.
+                          No es un plan genérico: se arma sobre la creencia que detectó
+                          este autoexamen (results[0]) y su guía práctica por bloque. */}
+                      <div className="space-y-5 pt-4 border-t border-[#C9A84C]/25">
+                        <div className="flex items-center gap-2 text-[#C9A84C]">
+                          <Heart className="w-5 h-5 text-[#C9A84C]" />
+                          <h4 className="text-lg font-bold font-display text-white">
+                            Tu plan para romper «{results[0]?.alias || 'esta creencia'}» y vivir redimido
+                          </h4>
+                        </div>
+                        <p className="text-xs text-white/60 leading-relaxed">
+                          Este plan no es igual para todos: nace de la creencia que tu
+                          autoexamen detectó, <strong className="text-white/85">{results[0]?.creencia}</strong>,
+                          y te lleva en 4 semanas de reconocer la mentira a vivir la verdad
+                          en Cristo. En Él ya fuiste redimido; este plan es el camino para
+                          creerlo y practicarlo cada día.
+                        </p>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="bg-red-500/[0.03] border border-red-500/15 p-5 rounded-2xl space-y-2">
+                            <span className="text-[10px] text-red-400 uppercase tracking-widest font-mono font-bold block">La mentira que se rompe</span>
+                            <p className="text-red-100 text-sm italic font-serif leading-relaxed">
+                              “{results[0]?.afirmacionTest}”
+                            </p>
+                          </div>
+                          <div className="bg-emerald-500/[0.03] border border-emerald-500/15 p-5 rounded-2xl space-y-2">
+                            <span className="text-[10px] text-emerald-400 uppercase tracking-widest font-mono font-bold block">La verdad que te redime</span>
+                            <p className="text-emerald-50 text-sm leading-relaxed">
+                              {results[0]?.verdad}
+                            </p>
+                            {results[0]?.versiculos?.[0] && (
+                              <p className="text-emerald-200/70 text-xs italic leading-relaxed">
+                                “{results[0].versiculos[0].txt}” — {results[0].versiculos[0].ref}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="bg-[#0F1411] border border-emerald-500/20 p-5 rounded-2xl space-y-2">
+                          <span className="text-[10px] text-emerald-400 font-mono tracking-wider uppercase font-bold block">
+                            Tu declaración de redención — repítela cada mañana
+                          </span>
+                          <p className="text-emerald-100 text-sm font-serif italic leading-relaxed">
+                            “{results[0]?.declaracion}”
+                          </p>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {[
+                            { semana: 'Semana 1 · Consciencia', objetivo: aiDiagnosis?.fase5?.semana1?.objetivo || 'Detectar la mentira en tu diálogo interior' },
+                            { semana: 'Semana 2 · Desmantelamiento', objetivo: aiDiagnosis?.fase5?.semana2?.objetivo || 'Debilitar la creencia con evidencias de la fidelidad de Dios' },
+                            { semana: 'Semana 3 · Renovación', objetivo: aiDiagnosis?.fase5?.semana3?.objetivo || 'Instalar la verdad con meditación diaria' },
+                            { semana: 'Semana 4 · Consolidación', objetivo: aiDiagnosis?.fase5?.semana4?.objetivo || 'Vivir la libertad con pasos de obediencia' },
+                          ].map((w) => (
+                            <div key={w.semana} className="bg-[#161616] border border-white/5 p-4 rounded-2xl space-y-1">
+                              <span className="text-[10px] font-mono font-bold text-[#C9A84C] uppercase block">{w.semana}</span>
+                              <p className="text-white/85 text-xs leading-relaxed">{w.objetivo}</p>
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-1">
+                          <button
+                            onClick={() => setActiveTab(2)}
+                            className="bg-gradient-to-r from-[#C9A84C] to-yellow-600 hover:from-yellow-400 hover:to-amber-500 text-[#0A0A0A] font-bold px-6 py-3.5 rounded-xl text-sm flex items-center justify-center gap-2 shadow-xl hover:scale-[1.02] transition-all w-full sm:w-auto cursor-pointer"
+                          >
+                            <Calendar className="w-4 h-4 text-[#0A0A0A]" />
+                            Ver mi plan completo de 30 días
+                          </button>
+                          <span className="text-[11px] text-white/40 text-center">
+                            Empieza hoy con los dos pasos de abajo — no esperes a sentirte listo.
+                          </span>
                         </div>
                       </div>
 
