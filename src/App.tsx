@@ -160,7 +160,6 @@ export default function App() {
   const [userName, setUserName] = useState(() => localStorage.getItem('ti_user_name') || '');
   const [userEmail, setUserEmail] = useState(() => localStorage.getItem('ti_user_email') || '');
   const [userAge, setUserAge] = useState(() => localStorage.getItem('ti_user_age') || '');
-  const [userGoal, setUserGoal] = useState(() => localStorage.getItem('ti_user_goal') || '');
   const [userXp, setUserXp] = useState<number>(() => {
     const saved = localStorage.getItem('ti_user_xp');
     return saved ? parseInt(saved, 10) : 0;
@@ -503,7 +502,6 @@ export default function App() {
     localStorage.setItem('ti_completed_days', JSON.stringify(completedDays));
     localStorage.setItem('ti_journal_notes', JSON.stringify(journalNotes));
     localStorage.setItem('ti_user_age', userAge);
-    localStorage.setItem('ti_user_goal', userGoal);
     localStorage.setItem('ti_user_xp', userXp.toString());
     localStorage.setItem('ti_achievements', JSON.stringify(achievements));
     localStorage.setItem('ti_selected_region', currentSelectedRegion);
@@ -540,7 +538,6 @@ export default function App() {
     selectedDayIndex,
     isUnveiled,
     userAge,
-    userGoal,
     userXp,
     achievements,
     currentSelectedRegion,
@@ -565,11 +562,9 @@ export default function App() {
     const savedName = localStorage.getItem('ti_user_name');
     const savedEmail = localStorage.getItem('ti_user_email');
     const savedAge = localStorage.getItem('ti_user_age');
-    const savedGoal = localStorage.getItem('ti_user_goal');
     if (savedName) setUserName(savedName);
     if (savedEmail) setUserEmail(savedEmail);
     if (savedAge) setUserAge(savedAge);
-    if (savedGoal) setUserGoal(savedGoal);
   }, []);
 
   const handleStartScreening = (e: React.FormEvent) => {
@@ -586,15 +581,10 @@ export default function App() {
       alert('Por favor ingresa tu edad.');
       return;
     }
-    if (!userGoal.trim()) {
-      alert('Por favor selecciona tu propósito principal para esta expedición.');
-      return;
-    }
 
     localStorage.setItem('ti_user_name', userName);
     localStorage.setItem('ti_user_email', userEmail);
     localStorage.setItem('ti_user_age', userAge);
-    localStorage.setItem('ti_user_goal', userGoal);
 
     // Initial Onboarding XP & Achievement
     setUserXp(25);
@@ -1133,7 +1123,6 @@ export default function App() {
     shownPatternsRef.current.clear();
     setSelectedBlockModalId(null);
     setUserAge('');
-    setUserGoal('');
     setUserXp(0);
     setAchievements({});
     scoredBeliefIdsRef.current.clear();
@@ -1169,7 +1158,6 @@ export default function App() {
     localStorage.removeItem('ti_selected_day_index');
     localStorage.removeItem('ti_is_unveiled');
     localStorage.removeItem('ti_user_age');
-    localStorage.removeItem('ti_user_goal');
     localStorage.removeItem('ti_user_xp');
     localStorage.removeItem('ti_achievements');
     localStorage.removeItem('ti_selected_region');
@@ -1193,7 +1181,6 @@ export default function App() {
           primaryBelief: primary,
           activeBeliefs: compiledResults.slice(0, 5),
           userAge,
-          userGoal,
           screeningAnswers,
           stageSummary
         })
@@ -1765,43 +1752,20 @@ export default function App() {
                       />
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      <div className="space-y-1.5 sm:col-span-1">
-                        <label className="text-xs text-[#C9A84C] font-mono uppercase tracking-wider font-semibold flex items-center gap-1.5">
-                          <Calendar className="w-3.5 h-3.5" /> Edad
-                        </label>
-                        <input
-                          type="number"
-                          required
-                          min="1"
-                          max="120"
-                          value={userAge}
-                          onChange={(e) => setUserAge(e.target.value)}
-                          placeholder="Años"
-                          className="w-full bg-[#202020] border border-white/5 rounded-xl pl-4 pr-4 py-3 text-sm focus:outline-none focus:border-[#C9A84C] text-white transition-all focus:bg-[#252525]"
-                        />
-                      </div>
-
-                      <div className="space-y-1.5 sm:col-span-2">
-                        <label className="text-xs text-[#C9A84C] font-mono uppercase tracking-wider font-semibold flex items-center gap-1.5">
-                          <Compass className="w-3.5 h-3.5" /> Objetivo Principal
-                        </label>
-                        <select
-                          required
-                          value={userGoal}
-                          onChange={(e) => setUserGoal(e.target.value)}
-                          className="w-full bg-[#202020] border border-white/5 rounded-xl px-3 py-3 text-sm focus:outline-none focus:border-[#C9A84C] text-white transition-all"
-                        >
-                          <option value="" disabled>Selecciona tu misión...</option>
-                          <option value="Superar el autosabotaje y procrastinación">Superar el autosabotaje</option>
-                          <option value="Sanar mi valor personal e identidad">Sanar mi valor personal</option>
-                          <option value="Romper el pánico al fracaso y perfeccionismo">Romper el pánico al fracaso</option>
-                          <option value="Alinear mis finanzas con la abundancia">Alinear mis finanzas</option>
-                          <option value="Integrar sanamente mis relaciones">Integrar mis relaciones</option>
-                          <option value="Vivir sin culpa de descanso y autoreproche">Descansar sin culpa</option>
-                          <option value="Descubrir mi propósito de vida y Reino">Descubrir mi propósito</option>
-                        </select>
-                      </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs text-[#C9A84C] font-mono uppercase tracking-wider font-semibold flex items-center gap-1.5">
+                        <Calendar className="w-3.5 h-3.5" /> Edad
+                      </label>
+                      <input
+                        type="number"
+                        required
+                        min="1"
+                        max="120"
+                        value={userAge}
+                        onChange={(e) => setUserAge(e.target.value)}
+                        placeholder="Años"
+                        className="w-full bg-[#202020] border border-white/5 rounded-xl pl-4 pr-4 py-3 text-sm focus:outline-none focus:border-[#C9A84C] text-white transition-all focus:bg-[#252525]"
+                      />
                     </div>
                   </div>
 
