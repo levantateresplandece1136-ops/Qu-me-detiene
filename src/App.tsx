@@ -1678,10 +1678,10 @@ export default function App() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.98 }}
                 transition={{ duration: 0.5 }}
-                className="space-y-10"
+                className="space-y-8 max-w-2xl mx-auto"
               >
-                {/* Floating Topbar Header inside Welcome screen */}
-                <div className="flex flex-col md:flex-row justify-between items-center pb-6 border-b border-white/5 gap-4">
+                {/* Encabezado */}
+                <div className="flex flex-col sm:flex-row justify-between items-center pb-6 border-b border-white/5 gap-4">
                   <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#C9A84C] to-yellow-600 flex items-center justify-center text-[#0D0D0D] shadow-lg shadow-[#C9A84C]/10">
                       <Brain className="w-5 h-5" />
@@ -1691,291 +1691,159 @@ export default function App() {
                       <h2 className="text-lg font-bold text-white tracking-tight -mt-0.5">Transformación Interior</h2>
                     </div>
                   </div>
-                  <div className="text-center md:text-right">
-                    <p className="text-xs font-serif italic text-white/50 max-w-sm">
-                      "Transformaos por medio de la renovación de vuestro entendimiento..."
-                      <span className="block not-italic font-mono text-[9px] uppercase font-bold text-[#C9A84C] mt-0.5">— Romanos 12:2</span>
+                  <p className="text-xs font-serif italic text-white/50 max-w-sm text-center sm:text-right">
+                    "Transformaos por medio de la renovación de vuestro entendimiento..."
+                    <span className="block not-italic font-mono text-[9px] uppercase font-bold text-[#C9A84C] mt-0.5">— Romanos 12:2</span>
+                  </p>
+                </div>
+
+                {/* Qué es y qué recibes */}
+                <div className="text-center space-y-4">
+                  <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight leading-tight font-display">
+                    ¿Qué te detiene?
+                  </h1>
+                  <p className="text-white/80 text-sm sm:text-base leading-relaxed font-light max-w-xl mx-auto">
+                    Un autoexamen para encontrar las creencias limitantes que dirigen tus decisiones. Al final recibirás tu creencia principal y un plan para romperla y vivir redimido.
+                  </p>
+                  <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+                    <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-white/70 bg-white/5 border border-white/10 px-3 py-1.5 rounded-full">
+                      <Clock className="w-3.5 h-3.5 text-[#C9A84C]" /> 8 a 12 minutos
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-white/70 bg-white/5 border border-white/10 px-3 py-1.5 rounded-full">
+                      <Lock className="w-3.5 h-3.5 text-[#C9A84C]" /> Respuestas privadas
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-white/70 bg-white/5 border border-white/10 px-3 py-1.5 rounded-full">
+                      <BookOpen className="w-3.5 h-3.5 text-[#C9A84C]" /> Con base bíblica
+                    </span>
+                  </div>
+                  <p className="text-xs text-white/50 italic font-serif max-w-xl mx-auto">
+                    Esto no te pone una etiqueta: te ayuda a entender cómo interpretas lo que vives.
+                  </p>
+                </div>
+
+                {/* Formulario de inicio */}
+                <form
+                  id="gate-form"
+                  onSubmit={handleStartScreening}
+                  className="bg-[#161616]/90 border border-[#C9A84C]/25 p-6 sm:p-7 rounded-[24px] shadow-2xl relative overflow-hidden space-y-6"
+                >
+                  <div className="absolute -right-16 -top-16 w-32 h-32 rounded-full bg-[#C9A84C]/10 blur-2xl pointer-events-none" />
+
+                  <div className="space-y-1.5">
+                    <h3 className="text-lg font-bold text-white tracking-tight">Empieza tu autoexamen</h3>
+                    <p className="text-xs text-white/50 leading-relaxed">
+                      Tus datos solo personalizan tu resultado.
                     </p>
                   </div>
-                </div>
 
-                {/* Hero Columns Section */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-                  
-                  {/* Left Column: Emotion, Mystery and Authoritative Content (span 7) */}
-                  <div className="lg:col-span-7 space-y-6">
-                    
-                    {/* Glowing Accent Badge */}
-                    <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-[#C9A84C]/30 bg-[#C9A84C]/5 text-[11px] text-[#C9A84C] font-mono uppercase tracking-[0.15em]">
-                      <Sparkles className="w-3.5 h-3.5 animate-pulse text-[#C9A84C]" />
-                      <span>Sinfonía de Neurociencia & Sabiduría Divina</span>
+                  <div className="space-y-4">
+                    <div className="space-y-1.5">
+                      <label className="text-xs text-[#C9A84C] font-mono uppercase tracking-wider font-semibold flex items-center gap-1.5">
+                        <User className="w-3.5 h-3.5" /> Nombre o Pseudónimo
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={userName}
+                        onChange={(e) => setUserName(e.target.value)}
+                        placeholder="Ej. María o Samuel"
+                        className="w-full bg-[#202020] border border-white/5 rounded-xl pl-4 pr-4 py-3 text-sm focus:outline-none focus:border-[#C9A84C] text-white transition-all focus:bg-[#252525] placeholder:text-white/20"
+                      />
                     </div>
 
-                    {/* Titular Principal */}
-                    <h1 className="text-2xl sm:text-3.5xl lg:text-4xl font-extrabold text-white tracking-tight leading-tight font-display">
-                      ¿Y si el mayor obstáculo para tu futuro no estuviera delante de ti... <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#C9A84C] to-yellow-500 drop-shadow-[0_2px_15px_rgba(201,168,76,0.25)]">sino dentro de ti?</span>
-                    </h1>
-
-                    {/* Subtítulo (Deep emotional trigger paragraphs) */}
-                    <div className="space-y-4 text-white/80 text-sm sm:text-base leading-relaxed font-sans font-light">
-                      <p>
-                        Durante años has tomado decisiones creyendo que eras libre.
-                      </p>
-                      <p>
-                        Pero algunas de tus creencias más profundas pudieron haberse formado por heridas, experiencias, miedos o mensajes que aceptaste como verdad.
-                      </p>
-                      <p className="text-[#C9A84C] font-normal border-l-2 border-[#C9A84C]/40 pl-4 bg-[#C9A84C]/5 py-2 rounded-r-xl">
-                        Descubre qué patrones invisibles están moldeando tus decisiones y comienza a renovar tu manera de pensar hoy mismo.
-                      </p>
+                    <div className="space-y-1.5">
+                      <label className="text-xs text-[#C9A84C] font-mono uppercase tracking-wider font-semibold flex items-center gap-1.5">
+                        <Mail className="w-3.5 h-3.5" /> Correo Electrónico
+                      </label>
+                      <input
+                        type="email"
+                        required
+                        value={userEmail}
+                        onChange={(e) => setUserEmail(e.target.value)}
+                        placeholder="correo@ejemplo.com"
+                        className="w-full bg-[#202020] border border-white/5 rounded-xl pl-4 pr-4 py-3 text-sm focus:outline-none focus:border-[#C9A84C] text-white transition-all focus:bg-[#252525] placeholder:text-white/20"
+                      />
                     </div>
 
-                    {/* Ultra-Polished Clinical Dashboard Card (Texto de Impacto) */}
-                    <div className="bg-[#161616]/70 border border-white/5 p-6 rounded-2xl relative overflow-hidden space-y-4">
-                      <div className="absolute top-0 right-0 w-32 h-32 bg-[radial-gradient(circle_at_top_right,rgba(201,168,76,0.06),transparent)] pointer-events-none" />
-                      
-                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                        <span className="text-[10px] font-mono uppercase tracking-widest text-[#C9A84C] font-semibold">Tasa de Comportamiento Inconsciente</span>
-                        <div className="flex items-center gap-2 bg-yellow-950/20 px-2 py-1 rounded border border-[#C9A84C]/20">
-                          <Activity className="w-3.5 h-3.5 text-[#C9A84C] animate-pulse" />
-                          <span className="text-[#C9A84C] font-mono text-xs font-bold">95% de Autómata</span>
-                        </div>
-                      </div>
-
-                      <div className="space-y-1">
-                        <h4 className="text-white text-sm font-semibold tracking-wide">El 95% de nuestras decisiones ocurren de forma automática.</h4>
-                        <p className="text-white/50 text-xs leading-relaxed">
-                          Muchas personas luchan continuamente contra síntomas visibles con pura fuerza de voluntad, sin percatarse del lazo oculto:
-                        </p>
-                      </div>
-
-                      {/* Diagnostic Checklist */}
-                      <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 pt-1.5">
-                        {[
-                          { title: 'Procrastinación', badge: 'Retraso' },
-                          { title: 'Miedo al fracaso', badge: 'Parálisis' },
-                          { title: 'Falta de confianza', badge: 'Duda' },
-                          { title: 'Relaciones conflictivas', badge: 'Patrón' },
-                          { title: 'Autosabotaje', badge: 'Límite' },
-                          { title: 'Estancamiento financiero', badge: 'Bloqueo' }
-                        ].map((item) => (
-                          <div key={item.title} className="flex items-center gap-2 text-xs text-white/90">
-                            <span className="text-amber-500 font-extrabold">✓</span>
-                            <span className="font-medium">{item.title}</span>
-                          </div>
-                        ))}
-                      </div>
-
-                      <p className="text-[11px] text-white/55 leading-relaxed pt-3 border-t border-white/5">
-                        Sin darse cuenta de que detrás existe una <strong>compleja estructura de creencias profundas</strong> que dirige cada decisión bajo la sombra.
-                      </p>
-                    </div>
-
-                    {/* Proverbios Quote Badge & Fundamental Principle */}
-                    <div className="bg-[#1C1C1C]/40 border border-white/5 px-4 py-3 rounded-xl flex items-center gap-3 text-xs italic text-white/70 font-serif">
-                      <span className="text-[#C9A84C] text-lg font-bold leading-none font-serif">“</span>
-                      <span>Porque cual es su pensamiento en su corazón, tal es él. — Proverbios 23:7</span>
-                    </div>
-
-                    <div className="bg-[#121212] border border-[#C9A84C]/30 p-4 rounded-2xl flex items-start gap-3 text-xs text-white/80">
-                      <div className="p-2 rounded-xl bg-[#C9A84C]/15 border border-[#C9A84C]/30 text-[#C9A84C] flex-shrink-0 mt-0.5">
-                        <Compass className="w-4 h-4 text-[#C9A84C]" />
-                      </div>
-                      <div className="space-y-1">
-                        <span className="text-[10px] font-mono uppercase tracking-widest text-[#C9A84C] font-bold block">
-                          Principio Fundamental • Regla Pastoral de Oro
-                        </span>
-                        <p className="text-[11px] text-white/70 leading-relaxed font-sans italic">
-                          «La herramienta no pretende decirle al consejero quién es la persona. Pretende ayudarle a hacer mejores preguntas para comprender cómo esa persona está interpretando sus circunstancias, qué está buscando, qué teme, cómo responde y dónde necesita ser redirigida hacia la verdad de Dios y la suficiencia de Cristo.»
-                        </p>
-                        <div className="flex items-center gap-2 pt-1 text-[10px] font-mono text-[#C9A84C]">
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#C9A84C]" />
-                          <span>La meta no es producir una etiqueta; es producir un mapa de comprensión y una dirección de ayuda.</span>
-                        </div>
-                      </div>
-                    </div>
-
-                  </div>
-
-                  {/* Right Column: Profile Gate Form & Action (span 5) */}
-                  <div className="lg:col-span-5">
-                    <form 
-                      id="gate-form" 
-                      onSubmit={handleStartScreening} 
-                      className="bg-[#161616]/90 border border-[#C9A84C]/25 p-6 sm:p-7 rounded-[24px] shadow-2xl relative overflow-hidden space-y-6"
-                    >
-                      {/* Decorative Gold flare blur inside the card */}
-                      <div className="absolute -right-16 -top-16 w-32 h-32 rounded-full bg-[#C9A84C]/10 blur-2xl pointer-events-none" />
-
-                      <div className="space-y-1.5">
-                        <span className="text-[10px] tracking-[0.25em] font-mono text-[#C9A84C]/80 block uppercase font-bold">Puerta de Acceso</span>
-                        <h3 className="text-lg font-bold text-white tracking-tight">Prepara tu Perfil de Exploración</h3>
-                        <p className="text-xs text-white/50 leading-relaxed">
-                          Introduce tus datos confidenciales para mapear tus interpretaciones, deseos y temores hacia la verdad de Dios y la suficiencia de Cristo.
-                        </p>
-                      </div>
-
-                      {/* Input fields */}
-                      <div className="space-y-4">
-                        <div className="space-y-1.5">
-                          <label className="text-xs text-[#C9A84C] font-mono uppercase tracking-wider font-semibold flex items-center gap-1.5">
-                            <User className="w-3.5 h-3.5" /> Nombre o Pseudónimo
-                          </label>
-                          <div className="relative">
-                            <input 
-                              type="text" 
-                              required
-                              value={userName}
-                              onChange={(e) => setUserName(e.target.value)}
-                              placeholder="Ej. María o Samuel" 
-                              className="w-full bg-[#202020] border border-white/5 rounded-xl pl-4 pr-4 py-3 text-sm focus:outline-none focus:border-[#C9A84C] text-white transition-all focus:bg-[#252525] placeholder:text-white/20"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="space-y-1.5">
-                          <label className="text-xs text-[#C9A84C] font-mono uppercase tracking-wider font-semibold flex items-center gap-1.5">
-                            <Mail className="w-3.5 h-3.5" /> Correo Electrónico
-                          </label>
-                          <div className="relative">
-                            <input 
-                              type="email" 
-                              required
-                              value={userEmail}
-                              onChange={(e) => setUserEmail(e.target.value)}
-                              placeholder="correo@ejemplo.com" 
-                              className="w-full bg-[#202020] border border-white/5 rounded-xl pl-4 pr-4 py-3 text-sm focus:outline-none focus:border-[#C9A84C] text-white transition-all focus:bg-[#252525] placeholder:text-white/20"
-                            />
-                          </div>
-                        </div>
-
-                        {/* Age and Main Goal Grid to keep compact layout */}
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                          <div className="space-y-1.5 sm:col-span-1">
-                            <label className="text-xs text-[#C9A84C] font-mono uppercase tracking-wider font-semibold flex items-center gap-1.5">
-                              <Calendar className="w-3.5 h-3.5" /> Edad
-                            </label>
-                            <input 
-                              type="number" 
-                              required
-                              min="1"
-                              max="120"
-                              value={userAge}
-                              onChange={(e) => setUserAge(e.target.value)}
-                              placeholder="Años" 
-                              className="w-full bg-[#202020] border border-white/5 rounded-xl pl-4 pr-4 py-3 text-sm focus:outline-none focus:border-[#C9A84C] text-white transition-all focus:bg-[#252525]"
-                            />
-                          </div>
-
-                          <div className="space-y-1.5 sm:col-span-2">
-                            <label className="text-xs text-[#C9A84C] font-mono uppercase tracking-wider font-semibold flex items-center gap-1.5">
-                              <Compass className="w-3.5 h-3.5" /> Objetivo Principal
-                            </label>
-                            <select 
-                              required
-                              value={userGoal}
-                              onChange={(e) => setUserGoal(e.target.value)}
-                              className="w-full bg-[#202020] border border-white/5 rounded-xl px-3 py-3 text-sm focus:outline-none focus:border-[#C9A84C] text-white transition-all"
-                            >
-                              <option value="" disabled>Selecciona tu misión...</option>
-                              <option value="Superar el autosabotaje y procrastinación">Superar el autosabotaje</option>
-                              <option value="Sanar mi valor personal e identidad">Sanar mi valor personal</option>
-                              <option value="Romper el pánico al fracaso y perfeccionismo">Romper el pánico al fracaso</option>
-                              <option value="Alinear mis finanzas con la abundancia">Alinear mis finanzas</option>
-                              <option value="Integrar sanamente mis relaciones">Integrar mis relaciones</option>
-                              <option value="Vivir sin culpa de descanso y autoreproche">Descansar sin culpa</option>
-                              <option value="Descubrir mi propósito de vida y Reino">Descubrir mi propósito</option>
-                            </select>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Dynamic Responsive Character Badge Preview */}
-                      <div className="bg-[#0A0A0A] border border-[#C9A84C]/15 rounded-2xl p-4 space-y-2 relative overflow-hidden transition-all hover:border-[#C9A84C]/35">
-                        <div className="absolute right-2 top-2 text-[#C9A84C]/10 pointer-events-none">
-                          <Compass className="w-16 h-16" />
-                        </div>
-                        <span className="text-[9px] tracking-[0.2em] font-mono text-[#C9A84C] block uppercase font-bold">FICHA DE CERTIFICACIÓN TEMPORAL</span>
-                        <div className="flex justify-between items-center">
-                          <div>
-                            <h4 className="text-sm font-bold text-white font-serif">{userName ? `Explorador ${userName}` : 'Explorador sin nombre'}</h4>
-                            <p className="text-[10px] text-white/50">{userAge ? `${userAge} años` : 'Edad no definida'} • Misión: {userGoal ? userGoal : 'Encontrar la verdad'}</p>
-                          </div>
-                          <div className="text-right">
-                            <span className="text-[10px] font-bold bg-[#C9A84C]/10 text-[#C9A84C] border border-[#C9A84C]/20 px-2 py-0.5 rounded-full font-mono">Nivel 1: Primera mirada</span>
-                          </div>
-                        </div>
-                        <div className="w-full bg-white/5 h-1 rounded-full overflow-hidden mt-1">
-                          <div className="bg-[#C9A84C] h-full w-[25%]" />
-                        </div>
-                        <p className="text-[9px] text-white/30 italic">✓ +25 puntos iniciales serán otorgados al iniciar la exploración.</p>
-                      </div>
-
-                      {/* Terms Acceptance */}
-                      <div className="flex items-start gap-2.5 bg-[#202020]/20 p-3.5 rounded-xl border border-white/5">
-                        <input 
-                          type="checkbox" 
-                          id="opt-terms" 
-                          checked={acceptedTerms}
-                          onChange={(e) => setAcceptedTerms(e.target.checked)}
-                          className="mt-1 w-4 h-4 cursor-pointer accent-[#C9A84C] rounded border-white/10" 
-                        />
-                        <label htmlFor="opt-terms" className="text-[11px] text-white/45 leading-normal cursor-pointer select-none">
-                          Autorizo registrar mis respuestas de forma segura y descargo la responsabilidad en pro del autoconocimiento.
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="space-y-1.5 sm:col-span-1">
+                        <label className="text-xs text-[#C9A84C] font-mono uppercase tracking-wider font-semibold flex items-center gap-1.5">
+                          <Calendar className="w-3.5 h-3.5" /> Edad
                         </label>
+                        <input
+                          type="number"
+                          required
+                          min="1"
+                          max="120"
+                          value={userAge}
+                          onChange={(e) => setUserAge(e.target.value)}
+                          placeholder="Años"
+                          className="w-full bg-[#202020] border border-white/5 rounded-xl pl-4 pr-4 py-3 text-sm focus:outline-none focus:border-[#C9A84C] text-white transition-all focus:bg-[#252525]"
+                        />
                       </div>
 
-                      {/* Primary GRAND CTA Button */}
-                      <button 
-                        type="submit"
-                        id="btn-gate-start"
-                        disabled={!acceptedTerms}
-                        className="w-full relative group overflow-hidden bg-gradient-to-r from-[#C9A84C] to-yellow-600 disabled:from-gray-700 disabled:to-gray-800 disabled:text-white/40 disabled:pointer-events-none text-[#0D0D0D] font-bold py-4 px-6 rounded-xl hover:shadow-[0_0_25px_rgba(201,168,76,0.35)] hover:scale-[1.01] transition-all flex items-center justify-center gap-2 cursor-pointer"
-                      >
-                        <span className="relative z-10 text-sm tracking-wide">Descubrir mi mapa de exploración interior</span>
-                        <ArrowRight className="w-4 h-4 relative z-10 transition-transform group-hover:translate-x-1" />
-                        <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
-                      </button>
-
-                      {/* Botón de Simulación de Prueba Rápida (Prompt 19) */}
-                      {SHOW_TEST_TOOLS && (
-                        <button
-                          type="button"
-                          onClick={handleLoadSimulatedCase19}
-                          className="w-full bg-[#181818] hover:bg-[#222222] border border-[#C9A84C]/40 text-[#C9A84C] font-mono text-xs font-bold py-3 px-4 rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer"
+                      <div className="space-y-1.5 sm:col-span-2">
+                        <label className="text-xs text-[#C9A84C] font-mono uppercase tracking-wider font-semibold flex items-center gap-1.5">
+                          <Compass className="w-3.5 h-3.5" /> Objetivo Principal
+                        </label>
+                        <select
+                          required
+                          value={userGoal}
+                          onChange={(e) => setUserGoal(e.target.value)}
+                          className="w-full bg-[#202020] border border-white/5 rounded-xl px-3 py-3 text-sm focus:outline-none focus:border-[#C9A84C] text-white transition-all"
                         >
-                          <Sparkles className="w-3.5 h-3.5" />
-                          <span>PROBAR CASO REAL SIMULADO (Control 5, Tiempo 5)</span>
-                        </button>
-                      )}
-
-                      {/* Supportive Info Badge List (Structured layout) */}
-                      <div className="grid grid-cols-2 gap-3 pt-3.5 border-t border-white/5">
-                        <div className="flex items-center gap-2 text-white/70">
-                          <Clock className="w-4 h-4 text-[#C9A84C] flex-shrink-0" />
-                          <span className="text-[11px] leading-tight font-medium">⏱ Duración: 8 a 12 minutos</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-white/70">
-                          <Activity className="w-4 h-4 text-[#C9A84C] flex-shrink-0" />
-                          <span className="text-[11px] leading-tight font-medium">📊 Mapa de comprensión</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-white/70">
-                          <Brain className="w-4 h-4 text-[#C9A84C] flex-shrink-0" />
-                          <span className="text-[11px] leading-tight font-medium">🧠 Patrones cognitivos</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-white/70">
-                          <BookOpen className="w-4 h-4 text-[#C9A84C] flex-shrink-0" />
-                          <span className="text-[11px] leading-tight font-medium">📖 Principios bíblicos</span>
-                        </div>
+                          <option value="" disabled>Selecciona tu misión...</option>
+                          <option value="Superar el autosabotaje y procrastinación">Superar el autosabotaje</option>
+                          <option value="Sanar mi valor personal e identidad">Sanar mi valor personal</option>
+                          <option value="Romper el pánico al fracaso y perfeccionismo">Romper el pánico al fracaso</option>
+                          <option value="Alinear mis finanzas con la abundancia">Alinear mis finanzas</option>
+                          <option value="Integrar sanamente mis relaciones">Integrar mis relaciones</option>
+                          <option value="Vivir sin culpa de descanso y autoreproche">Descansar sin culpa</option>
+                          <option value="Descubrir mi propósito de vida y Reino">Descubrir mi propósito</option>
+                        </select>
                       </div>
-
-                      <div className="text-center text-white/35 text-[10px] font-mono uppercase tracking-wider pt-1">
-                        🔒 Privacidad total y cifrado local
-                      </div>
-                    </form>
+                    </div>
                   </div>
 
-                </div>
+                  <div className="flex items-start gap-2.5 bg-[#202020]/20 p-3.5 rounded-xl border border-white/5">
+                    <input
+                      type="checkbox"
+                      id="opt-terms"
+                      checked={acceptedTerms}
+                      onChange={(e) => setAcceptedTerms(e.target.checked)}
+                      className="mt-1 w-4 h-4 cursor-pointer accent-[#C9A84C] rounded border-white/10"
+                    />
+                    <label htmlFor="opt-terms" className="text-[11px] text-white/45 leading-normal cursor-pointer select-none">
+                      Acepto que mis respuestas se guarden solo en mi dispositivo para mi autoexamen.
+                    </label>
+                  </div>
 
+                  <button
+                    type="submit"
+                    id="btn-gate-start"
+                    disabled={!acceptedTerms}
+                    className="w-full relative group overflow-hidden bg-gradient-to-r from-[#C9A84C] to-yellow-600 disabled:from-gray-700 disabled:to-gray-800 disabled:text-white/40 disabled:pointer-events-none text-[#0D0D0D] font-bold py-4 px-6 rounded-xl hover:shadow-[0_0_25px_rgba(201,168,76,0.35)] hover:scale-[1.01] transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <span className="relative z-10 text-sm tracking-wide">Comenzar mi autoexamen</span>
+                    <ArrowRight className="w-4 h-4 relative z-10 transition-transform group-hover:translate-x-1" />
+                    <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </button>
+
+                  {SHOW_TEST_TOOLS && (
+                    <button
+                      type="button"
+                      onClick={handleLoadSimulatedCase19}
+                      className="w-full bg-[#181818] hover:bg-[#222222] border border-[#C9A84C]/40 text-[#C9A84C] font-mono text-xs font-bold py-3 px-4 rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>PROBAR CASO REAL SIMULADO (Control 5, Tiempo 5)</span>
+                    </button>
+                  )}
+
+                  <p className="text-center text-white/35 text-[10px] font-mono uppercase tracking-wider">
+                    🔒 Privacidad total y cifrado local
+                  </p>
+                </form>
               </motion.div>
             )}
 
