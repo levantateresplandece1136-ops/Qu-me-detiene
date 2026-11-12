@@ -40,8 +40,8 @@ import { practicalStepsByBlock } from './data/practicalSteps';
 import { blockDefinitions, detectBlockInteractions, DetectedInteraction, BlockDefinition } from './data/blockDefinitions';
 import { generateFallbackData, AIDiagnosis } from './utils/fallbackGenerator';
 import { downloadPDFResults } from './utils/pdfGenerator';
+import { PLAN_PROVERBIOS, CITA_BASE, TEXTO_CITA_BASE, elementForDay, elementLines } from './utils/planProverbios';
 import GoldenCelebration from './components/GoldenCelebration';
-import { HeartExplorationSection } from './components/HeartExplorationSection';
 import { SIMULATED_CASE_19 } from './data/counselingMovements';
 import GuidedExplorationFlow from './components/GuidedExplorationFlow';
 import { HEART_STAGE_QUESTIONS } from './data/heartStageQuestions';
@@ -59,7 +59,7 @@ export interface UserResult extends CreenciaRecord {
   score?: number;
 }
 
-type Step = 'welcome' | 'screening' | 'calculating_blocks' | 'deep_dive' | 'heart_stages' | 'validation' | 'stage_transition' | 'generating_results' | 'results';
+type Step = 'welcome' | 'screening' | 'calculating_blocks' | 'deep_dive' | 'heart_stages' | 'validation' | 'stage_transition' | 'generating_results' | 'tiebreak' | 'results';
 
 // Evaluación pastoral para el monitoreo de renovación mental (Romanos 12:2)
 const getProgressEvaluation = (scores: Record<string, number>, name: string) => {
@@ -99,28 +99,7 @@ const getProgressEvaluation = (scores: Record<string, number>, name: string) => 
 const getPastoralConversationalFeedback = (blockId: string, score: number, name: string) => {
   const formattedName = name ? name.trim() : "amigo/a";
   if (score >= 4) {
-    switch (blockId) {
-      case "capacidad-identidad":
-        return `Comprendo esa sensación, ${formattedName}. La voz que te exige estar siempre a la altura puede ser muy agotadora. Recuerda que tu verdadero valor y suficiencia provienen de Dios (2 Corintios 3:5).`;
-      case "merecimiento-vinculo":
-        return `Entiendo el temor a que la calma no dure, ${formattedName}. Cuando nos acostumbramos a la tensión, cuesta recibir la paz. Pero la bondad de Dios es sincera y no tiene condiciones ocultas.`;
-      case "control-entorno":
-        return `Estás cargando el peso de resolverlo todo en tus propias fuerzas, ${formattedName}. Respira hondo... Dios cuida de ti con amor y fidelidad día tras día.`;
-      case "rendimiento-logro":
-        return `Querido/a ${formattedName}, descansar no es un error. Tu dignidad no depende de cuánto produces, sino del amor incondicional con el que Dios te mira.`;
-      case "relaciones-poder":
-        return `Guardar silencio por temor al conflicto deja un gran desgaste interior, ${formattedName}. Dios te da sabiduría para hablar la verdad con amor y poner límites sanos con serenidad.`;
-      case "cuerpo-salud":
-        return `El descanso no es tiempo perdido, ${formattedName}; es parte del cuidado responsable del templo que Dios te ha confiado.`;
-      case "espiritualidad-trascendencia":
-        return `A veces la rutina o las dudas hacen sentir lejana la presencia de Dios, ${formattedName}. Pero Él te conoce, te ama y permanece cerca aun en los momentos de silencio.`;
-      case "tiempo-futuro":
-        return `La prisa y la preocupación por el mañana desgastan el presente, ${formattedName}. Tu tiempo está en las manos de Dios y su paz te acompaña hoy.`;
-      case "genero-identidad-social":
-        return `Las etiquetas que otros pusieron sobre tu historia no definen tu futuro, ${formattedName}. En Cristo tienes una nueva identidad y un propósito claro.`;
-      default:
-        return `Gracias por tu honestidad, ${formattedName}. Reconocer lo que sentimos es siempre el primer paso hacia la libertad.`;
-    }
+    return `Gracias por tu honestidad, ${formattedName}. Reconocer lo que sientes es siempre el primer paso hacia la libertad.`;
   } else if (score === 3) {
     return `Reconocer que esta situación ocurre a veces es un paso muy valioso, ${formattedName}. Poco a poco la verdad irá trayendo mayor claridad y descanso.`;
   } else {
@@ -160,7 +139,6 @@ export default function App() {
   const [userName, setUserName] = useState(() => localStorage.getItem('ti_user_name') || '');
   const [userEmail, setUserEmail] = useState(() => localStorage.getItem('ti_user_email') || '');
   const [userAge, setUserAge] = useState(() => localStorage.getItem('ti_user_age') || '');
-  const [userGoal, setUserGoal] = useState(() => localStorage.getItem('ti_user_goal') || '');
   const [userXp, setUserXp] = useState<number>(() => {
     const saved = localStorage.getItem('ti_user_xp');
     return saved ? parseInt(saved, 10) : 0;
@@ -290,6 +268,26 @@ export default function App() {
     const saved = localStorage.getItem('ti_results');
     return saved ? JSON.parse(saved) : [];
   });
+
+  // Desempate de creencia principal (fix: "siempre sale la misma creencia").
+  // El puntaje compuesto (screening x 10 + intensidad 0-2) empata con mucha
+  // frecuencia porque la exploración profunda solo tiene 3 niveles; antes el
+  // desempate lo resolvía el orden estable del arreglo, es decir, siempre la
+  // primera creencia de la base de datos del bloque dominante. Cuando varias
+  // creencias empatan en el puntaje máximo, se le pregunta a la persona cuál
+  // le describe mejor en lugar de adivinarlo por orden de lista.
+  const [tiebreakCandidates, setTiebreakCandidates] = useState<UserResult[]>([]);
+  const [tiebreakBonusId, setTiebreakBonusId] = useState<number | null>(() => {
+    const saved = localStorage.getItem('ti_tiebreak_bonus_id');
+    return saved ? parseInt(saved, 10) : null;
+  });
+
+  const chooseTiebreakBelief = (beliefId: number) => {
+    setTiebreakBonusId(beliefId);
+    localStorage.setItem('ti_tiebreak_bonus_id', String(beliefId));
+    setTiebreakCandidates([]);
+    setStep('generating_results');
+  };
 
   // New robust states for the 8-phase AI transformation kit
   const [aiDiagnosis, setAiDiagnosis] = useState<AIDiagnosis | null>(() => {
@@ -483,7 +481,6 @@ export default function App() {
     localStorage.setItem('ti_completed_days', JSON.stringify(completedDays));
     localStorage.setItem('ti_journal_notes', JSON.stringify(journalNotes));
     localStorage.setItem('ti_user_age', userAge);
-    localStorage.setItem('ti_user_goal', userGoal);
     localStorage.setItem('ti_user_xp', userXp.toString());
     localStorage.setItem('ti_achievements', JSON.stringify(achievements));
     localStorage.setItem('ti_selected_region', currentSelectedRegion);
@@ -520,7 +517,6 @@ export default function App() {
     selectedDayIndex,
     isUnveiled,
     userAge,
-    userGoal,
     userXp,
     achievements,
     currentSelectedRegion,
@@ -545,11 +541,9 @@ export default function App() {
     const savedName = localStorage.getItem('ti_user_name');
     const savedEmail = localStorage.getItem('ti_user_email');
     const savedAge = localStorage.getItem('ti_user_age');
-    const savedGoal = localStorage.getItem('ti_user_goal');
     if (savedName) setUserName(savedName);
     if (savedEmail) setUserEmail(savedEmail);
     if (savedAge) setUserAge(savedAge);
-    if (savedGoal) setUserGoal(savedGoal);
   }, []);
 
   const handleStartScreening = (e: React.FormEvent) => {
@@ -566,15 +560,10 @@ export default function App() {
       alert('Por favor ingresa tu edad.');
       return;
     }
-    if (!userGoal.trim()) {
-      alert('Por favor selecciona tu propósito principal para esta expedición.');
-      return;
-    }
 
     localStorage.setItem('ti_user_name', userName);
     localStorage.setItem('ti_user_email', userEmail);
     localStorage.setItem('ti_user_age', userAge);
-    localStorage.setItem('ti_user_goal', userGoal);
 
     // Initial Onboarding XP & Achievement
     setUserXp(25);
@@ -612,9 +601,9 @@ export default function App() {
       // Award XP for first discovery of this region (only if not already answered)
       if (!alreadyAnswered) {
         setUserXp(currentXp => currentXp + 30);
-        setXpNotification({ 
-          xp: 30, 
-          label: `¡Región "${bloquesDiagnostico[regionId as keyof typeof bloquesDiagnostico]?.title}" Explorada!` 
+        setXpNotification({
+          xp: 30,
+          label: "¡Región explorada!"
         });
         setTimeout(() => setXpNotification(null), 3000);
       }
@@ -651,7 +640,7 @@ export default function App() {
     );
     if (newPattern) {
       shownPatternsRef.current.add(newPattern.id);
-      setEmergingPattern(`${newPattern.blockA.name} y ${newPattern.blockB.name} tienden a ir juntos en tus respuestas. Lo exploraremos más adelante.`);
+      setEmergingPattern('Hay un patrón que emerge en tus respuestas. Lo exploraremos más adelante.');
     } else {
       setEmergingPattern('');
     }
@@ -780,7 +769,7 @@ export default function App() {
       scoredBeliefIdsRef.current.add(currentQuestion.id);
       // Award XP (15 XP for cataloging each deep belief node)
       setUserXp(currentXp => currentXp + 15);
-      setXpNotification({ xp: 15, label: `Explorando: ${currentQuestion.bloque}` });
+      setXpNotification({ xp: 15, label: "Afirmación registrada" });
       setTimeout(() => setXpNotification(null), 3000);
     }
 
@@ -904,26 +893,11 @@ export default function App() {
 
   // Fase 4A: micro-insight de una sola oración, calculado con datos reales (nunca con una sola respuesta)
   const getStageInsight = (from: 1 | 2 | 6 | null): string => {
-    const titleOf = (id: string) => (bloquesDiagnostico as any)[id]?.title || id;
     if (from === 1) {
-      const high = Object.entries(screeningAnswers)
-        .filter(([, sc]) => (sc as number) >= 4)
-        .sort((a, b) => (b[1] as number) - (a[1] as number))
-        .map(([id]) => titleOf(id));
-      if (high.length >= 2) return `Tus respuestas muestran más resonancia en ${high[0]} y ${high[1]}. Ahora veremos qué pensamientos hay detrás.`;
-      if (high.length === 1) return `${high[0]} es el área donde más resonaron tus respuestas. Ahora veremos qué pensamientos hay detrás.`;
-      return 'Tus respuestas son bastante equilibradas; exploraremos las áreas que más resonaron.';
+      return 'Tus respuestas muestran más resonancia en algunas áreas. Ahora veremos qué pensamientos hay detrás.';
     }
     if (from === 2) {
-      const strongByBlock: Record<string, number> = {};
-      deepDiveQuestions.forEach(q => {
-        if (deepDiveAnswers[q.id] === 2) {
-          strongByBlock[q.bloqueId] = (strongByBlock[q.bloqueId] || 0) + 1;
-        }
-      });
-      const top = Object.entries(strongByBlock).sort((a, b) => b[1] - a[1])[0];
-      if (top && top[1] >= 2) return `Varias afirmaciones sobre ${titleOf(top[0])} resonaron contigo con fuerza. Ahora exploraremos qué buscas y qué temes.`;
-      return 'Algunas afirmaciones resonaron más que otras. Ahora exploraremos qué buscas y qué temes.';
+      return 'Algunas afirmaciones resonaron contigo con fuerza. Ahora exploraremos qué buscas y qué temes.';
     }
     if (from === 6) {
       const related = new Set<string>();
@@ -1089,6 +1063,11 @@ export default function App() {
     setStageIndex(0);
     setResults([]);
     setIntroParagraph('');
+    setTiebreakCandidates([]);
+    setTiebreakBonusId(null);
+    setIsSimulatedCase19(false);
+    localStorage.removeItem('ti_tiebreak_bonus_id');
+    localStorage.removeItem('ti_is_simulated_case_19');
     setCompletedDays({});
     setJournalNotes({});
     setExpandedBelief(null);
@@ -1108,7 +1087,6 @@ export default function App() {
     shownPatternsRef.current.clear();
     setSelectedBlockModalId(null);
     setUserAge('');
-    setUserGoal('');
     setUserXp(0);
     setAchievements({});
     scoredBeliefIdsRef.current.clear();
@@ -1144,7 +1122,6 @@ export default function App() {
     localStorage.removeItem('ti_selected_day_index');
     localStorage.removeItem('ti_is_unveiled');
     localStorage.removeItem('ti_user_age');
-    localStorage.removeItem('ti_user_goal');
     localStorage.removeItem('ti_user_xp');
     localStorage.removeItem('ti_achievements');
     localStorage.removeItem('ti_selected_region');
@@ -1168,7 +1145,6 @@ export default function App() {
           primaryBelief: primary,
           activeBeliefs: compiledResults.slice(0, 5),
           userAge,
-          userGoal,
           screeningAnswers,
           stageSummary
         })
@@ -1224,8 +1200,6 @@ export default function App() {
         const sortedBlocks = Object.entries(blockScores)
           .sort((a, b) => b[1] - a[1]);
         
-        const primaryBlockId = sortedBlocks[0]?.[0] || 'capacidad-identidad';
-        
         // Empathic, prudent, and biblically sound introductory paragraph
         const intros: Record<string, string> = {
           "capacidad-identidad": "Con el tiempo, tu mente aprendió a protegerse exigiendo una preparación exhaustiva por temor al rechazo o a no estar a la altura. Esa voz interior crítica nació para cuidarte ante la crítica, pero hoy te desgasta. La verdad bíblica es que tu suficiencia y competencia provienen de Dios, no de una perfección inalcanzable (2 Corintios 3:5).",
@@ -1239,8 +1213,6 @@ export default function App() {
           "genero-identidad-social": "Has sentido el peso de etiquetas familiares, sociales o de tu historia que intentaron poner un techo a lo que puedes alcanzar. En Cristo esas barreras pierden su poder: tu identidad y llamado provienen del Reino de Dios (Gálatas 3:28)."
         };
 
-        setIntroParagraph(intros[primaryBlockId] || intros["capacidad-identidad"]);
-        
         // Compile beliefs results
         const compiled: UserResult[] = [];
         creenciasDatabase.forEach(item => {
@@ -1266,13 +1238,53 @@ export default function App() {
           });
         }
 
-        // CRITICAL FIX: Sort beliefs by composite weight: (screeningScore * 10) + deepDiveIntensity
-        // This ensures the primary belief matches the user's highest screening block(s)!
-        compiled.sort((a, b) => {
-          const scoreA = (screeningAnswers[a.bloqueId] || 1) * 10 + a.intensity;
-          const scoreB = (screeningAnswers[b.bloqueId] || 1) * 10 + b.intensity;
-          return scoreB - scoreA;
-        });
+        // Puntaje compuesto: (screening del bloque x 10) + intensidad de la
+        // exploración profunda (1 = a veces, 2 = prácticamente sí).
+        const beliefScore = (b: UserResult) =>
+          (screeningAnswers[b.bloqueId] || 1) * 10 + (b.intensity || 1);
+
+        compiled.sort((a, b) => beliefScore(b) - beliefScore(a));
+
+        // FIX "siempre la misma creencia": con solo 3 niveles de intensidad,
+        // varias creencias empatan en el puntaje máximo y el orden estable del
+        // arreglo elegía siempre la primera de la base de datos. Si hay
+        // empate en la cima, no se adivina: se le pregunta a la persona.
+        const maxScore = compiled.length > 0 ? beliefScore(compiled[0]) : 0;
+        const tiedAtTop = compiled.filter(b => beliefScore(b) === maxScore);
+        const bonusIsValid =
+          tiebreakBonusId !== null && tiedAtTop.some(b => b.id === tiebreakBonusId);
+        if (tiedAtTop.length > 1 && !bonusIsValid) {
+          // Hasta 6 candidatas, con diversidad de bloques: primero una por
+          // bloque distinto y luego se completa con las siguientes empatadas.
+          // Así, con un empate entre los 9 bloques, la persona puede elegir
+          // una creencia de otro bloque y no solo las 3 primeras de la lista.
+          const diverseTied: UserResult[] = [];
+          const seenBlocks = new Set<string>();
+          for (const b of tiedAtTop) {
+            if (diverseTied.length < 3 && !seenBlocks.has(b.bloqueId)) {
+              diverseTied.push(b);
+              seenBlocks.add(b.bloqueId);
+            }
+          }
+          for (const b of tiedAtTop) {
+            if (diverseTied.length >= 6) break;
+            if (!diverseTied.includes(b)) diverseTied.push(b);
+          }
+          setTiebreakCandidates(diverseTied);
+          setStep('tiebreak');
+          return;
+        }
+        if (bonusIsValid) {
+          compiled.sort((a, b) =>
+            (b.id === tiebreakBonusId ? 1 : 0) - (a.id === tiebreakBonusId ? 1 : 0) ||
+            beliefScore(b) - beliefScore(a)
+          );
+        }
+
+        // La introducción empática sigue a la creencia principal elegida,
+        // no al primer bloque empatado del screening.
+        const primaryBlockId = compiled[0]?.bloqueId || sortedBlocks[0]?.[0] || 'capacidad-identidad';
+        setIntroParagraph(intros[primaryBlockId] || intros["capacidad-identidad"]);
 
         setResults(compiled);
 
@@ -1385,14 +1397,30 @@ export default function App() {
     return sortedBlocksWithScores.filter(b => b.score === maxScore);
   }, [sortedBlocksWithScores]);
 
+  // El bloque principal sigue a la creencia principal elegida (results[0]),
+  // no al primer bloque empatado del screening: antes, con un empate en el
+  // screening, la introducción, la guía práctica y el plan siempre eran de
+  // Capacidad e Identidad aunque la creencia detectada fuera de otro bloque.
   const primaryBlock = useMemo(() => {
+    if (results.length > 0) {
+      const chosen = results[0];
+      const info = (bloquesDiagnostico as any)[chosen.bloqueId];
+      if (info) {
+        return {
+          id: chosen.bloqueId,
+          title: info.title,
+          shortTitle: info.shortTitle,
+          score: screeningAnswers[chosen.bloqueId] || 1
+        };
+      }
+    }
     return dominantBlocks[0] || sortedBlocksWithScores[0] || {
       id: 'capacidad-identidad',
       title: 'Capacidad e Identidad',
       shortTitle: 'Capacidad',
       score: 1
     };
-  }, [dominantBlocks, sortedBlocksWithScores]);
+  }, [dominantBlocks, sortedBlocksWithScores, results, screeningAnswers]);
 
   // Nivel de confianza calculado para cada interacción según los 6 factores metodológicos
   const interactionConfidence = useMemo(() => {
@@ -1601,10 +1629,10 @@ export default function App() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.98 }}
                 transition={{ duration: 0.5 }}
-                className="space-y-10"
+                className="space-y-8 max-w-2xl mx-auto"
               >
-                {/* Floating Topbar Header inside Welcome screen */}
-                <div className="flex flex-col md:flex-row justify-between items-center pb-6 border-b border-white/5 gap-4">
+                {/* Encabezado */}
+                <div className="flex flex-col sm:flex-row justify-between items-center pb-6 border-b border-white/5 gap-4">
                   <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#C9A84C] to-yellow-600 flex items-center justify-center text-[#0D0D0D] shadow-lg shadow-[#C9A84C]/10">
                       <Brain className="w-5 h-5" />
@@ -1614,291 +1642,136 @@ export default function App() {
                       <h2 className="text-lg font-bold text-white tracking-tight -mt-0.5">Transformación Interior</h2>
                     </div>
                   </div>
-                  <div className="text-center md:text-right">
-                    <p className="text-xs font-serif italic text-white/50 max-w-sm">
-                      "Transformaos por medio de la renovación de vuestro entendimiento..."
-                      <span className="block not-italic font-mono text-[9px] uppercase font-bold text-[#C9A84C] mt-0.5">— Romanos 12:2</span>
+                  <p className="text-xs font-serif italic text-white/50 max-w-sm text-center sm:text-right">
+                    "Transformaos por medio de la renovación de vuestro entendimiento..."
+                    <span className="block not-italic font-mono text-[9px] uppercase font-bold text-[#C9A84C] mt-0.5">— Romanos 12:2</span>
+                  </p>
+                </div>
+
+                {/* Qué es y qué recibes */}
+                <div className="text-center space-y-4">
+                  <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight leading-tight font-display">
+                    ¿Qué te detiene?
+                  </h1>
+                  <p className="text-white/80 text-sm sm:text-base leading-relaxed font-light max-w-xl mx-auto">
+                    Un autoexamen para encontrar las creencias limitantes que dirigen tus decisiones. Al final recibirás tu creencia principal y un plan para romperla y vivir redimido.
+                  </p>
+                  <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+                    <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-white/70 bg-white/5 border border-white/10 px-3 py-1.5 rounded-full">
+                      <Clock className="w-3.5 h-3.5 text-[#C9A84C]" /> 8 a 12 minutos
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-white/70 bg-white/5 border border-white/10 px-3 py-1.5 rounded-full">
+                      <Lock className="w-3.5 h-3.5 text-[#C9A84C]" /> Respuestas privadas
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-white/70 bg-white/5 border border-white/10 px-3 py-1.5 rounded-full">
+                      <BookOpen className="w-3.5 h-3.5 text-[#C9A84C]" /> Con base bíblica
+                    </span>
+                  </div>
+                  <p className="text-xs text-white/50 italic font-serif max-w-xl mx-auto">
+                    Esto no te pone una etiqueta: te ayuda a entender cómo interpretas lo que vives.
+                  </p>
+                </div>
+
+                {/* Formulario de inicio */}
+                <form
+                  id="gate-form"
+                  onSubmit={handleStartScreening}
+                  className="bg-[#161616]/90 border border-[#C9A84C]/25 p-6 sm:p-7 rounded-[24px] shadow-2xl relative overflow-hidden space-y-6"
+                >
+                  <div className="absolute -right-16 -top-16 w-32 h-32 rounded-full bg-[#C9A84C]/10 blur-2xl pointer-events-none" />
+
+                  <div className="space-y-1.5">
+                    <h3 className="text-lg font-bold text-white tracking-tight">Empieza tu autoexamen</h3>
+                    <p className="text-xs text-white/50 leading-relaxed">
+                      Tus datos solo personalizan tu resultado.
                     </p>
                   </div>
-                </div>
 
-                {/* Hero Columns Section */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-                  
-                  {/* Left Column: Emotion, Mystery and Authoritative Content (span 7) */}
-                  <div className="lg:col-span-7 space-y-6">
-                    
-                    {/* Glowing Accent Badge */}
-                    <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-[#C9A84C]/30 bg-[#C9A84C]/5 text-[11px] text-[#C9A84C] font-mono uppercase tracking-[0.15em]">
-                      <Sparkles className="w-3.5 h-3.5 animate-pulse text-[#C9A84C]" />
-                      <span>Sinfonía de Neurociencia & Sabiduría Divina</span>
+                  <div className="space-y-4">
+                    <div className="space-y-1.5">
+                      <label className="text-xs text-[#C9A84C] font-mono uppercase tracking-wider font-semibold flex items-center gap-1.5">
+                        <User className="w-3.5 h-3.5" /> Nombre o Pseudónimo
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={userName}
+                        onChange={(e) => setUserName(e.target.value)}
+                        placeholder="Ej. María o Samuel"
+                        className="w-full bg-[#202020] border border-white/5 rounded-xl pl-4 pr-4 py-3 text-sm focus:outline-none focus:border-[#C9A84C] text-white transition-all focus:bg-[#252525] placeholder:text-white/20"
+                      />
                     </div>
 
-                    {/* Titular Principal */}
-                    <h1 className="text-2xl sm:text-3.5xl lg:text-4xl font-extrabold text-white tracking-tight leading-tight font-display">
-                      ¿Y si el mayor obstáculo para tu futuro no estuviera delante de ti... <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#C9A84C] to-yellow-500 drop-shadow-[0_2px_15px_rgba(201,168,76,0.25)]">sino dentro de ti?</span>
-                    </h1>
-
-                    {/* Subtítulo (Deep emotional trigger paragraphs) */}
-                    <div className="space-y-4 text-white/80 text-sm sm:text-base leading-relaxed font-sans font-light">
-                      <p>
-                        Durante años has tomado decisiones creyendo que eras libre.
-                      </p>
-                      <p>
-                        Pero algunas de tus creencias más profundas pudieron haberse formado por heridas, experiencias, miedos o mensajes que aceptaste como verdad.
-                      </p>
-                      <p className="text-[#C9A84C] font-normal border-l-2 border-[#C9A84C]/40 pl-4 bg-[#C9A84C]/5 py-2 rounded-r-xl">
-                        Descubre qué patrones invisibles están moldeando tus decisiones y comienza a renovar tu manera de pensar hoy mismo.
-                      </p>
+                    <div className="space-y-1.5">
+                      <label className="text-xs text-[#C9A84C] font-mono uppercase tracking-wider font-semibold flex items-center gap-1.5">
+                        <Mail className="w-3.5 h-3.5" /> Correo Electrónico
+                      </label>
+                      <input
+                        type="email"
+                        required
+                        value={userEmail}
+                        onChange={(e) => setUserEmail(e.target.value)}
+                        placeholder="correo@ejemplo.com"
+                        className="w-full bg-[#202020] border border-white/5 rounded-xl pl-4 pr-4 py-3 text-sm focus:outline-none focus:border-[#C9A84C] text-white transition-all focus:bg-[#252525] placeholder:text-white/20"
+                      />
                     </div>
 
-                    {/* Ultra-Polished Clinical Dashboard Card (Texto de Impacto) */}
-                    <div className="bg-[#161616]/70 border border-white/5 p-6 rounded-2xl relative overflow-hidden space-y-4">
-                      <div className="absolute top-0 right-0 w-32 h-32 bg-[radial-gradient(circle_at_top_right,rgba(201,168,76,0.06),transparent)] pointer-events-none" />
-                      
-                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                        <span className="text-[10px] font-mono uppercase tracking-widest text-[#C9A84C] font-semibold">Tasa de Comportamiento Inconsciente</span>
-                        <div className="flex items-center gap-2 bg-yellow-950/20 px-2 py-1 rounded border border-[#C9A84C]/20">
-                          <Activity className="w-3.5 h-3.5 text-[#C9A84C] animate-pulse" />
-                          <span className="text-[#C9A84C] font-mono text-xs font-bold">95% de Autómata</span>
-                        </div>
-                      </div>
-
-                      <div className="space-y-1">
-                        <h4 className="text-white text-sm font-semibold tracking-wide">El 95% de nuestras decisiones ocurren de forma automática.</h4>
-                        <p className="text-white/50 text-xs leading-relaxed">
-                          Muchas personas luchan continuamente contra síntomas visibles con pura fuerza de voluntad, sin percatarse del lazo oculto:
-                        </p>
-                      </div>
-
-                      {/* Diagnostic Checklist */}
-                      <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 pt-1.5">
-                        {[
-                          { title: 'Procrastinación', badge: 'Retraso' },
-                          { title: 'Miedo al fracaso', badge: 'Parálisis' },
-                          { title: 'Falta de confianza', badge: 'Duda' },
-                          { title: 'Relaciones conflictivas', badge: 'Patrón' },
-                          { title: 'Autosabotaje', badge: 'Límite' },
-                          { title: 'Estancamiento financiero', badge: 'Bloqueo' }
-                        ].map((item) => (
-                          <div key={item.title} className="flex items-center gap-2 text-xs text-white/90">
-                            <span className="text-amber-500 font-extrabold">✓</span>
-                            <span className="font-medium">{item.title}</span>
-                          </div>
-                        ))}
-                      </div>
-
-                      <p className="text-[11px] text-white/55 leading-relaxed pt-3 border-t border-white/5">
-                        Sin darse cuenta de que detrás existe una <strong>compleja estructura de creencias profundas</strong> que dirige cada decisión bajo la sombra.
-                      </p>
+                    <div className="space-y-1.5">
+                      <label className="text-xs text-[#C9A84C] font-mono uppercase tracking-wider font-semibold flex items-center gap-1.5">
+                        <Calendar className="w-3.5 h-3.5" /> Edad
+                      </label>
+                      <input
+                        type="number"
+                        required
+                        min="1"
+                        max="120"
+                        value={userAge}
+                        onChange={(e) => setUserAge(e.target.value)}
+                        placeholder="Años"
+                        className="w-full bg-[#202020] border border-white/5 rounded-xl pl-4 pr-4 py-3 text-sm focus:outline-none focus:border-[#C9A84C] text-white transition-all focus:bg-[#252525]"
+                      />
                     </div>
-
-                    {/* Proverbios Quote Badge & Fundamental Principle */}
-                    <div className="bg-[#1C1C1C]/40 border border-white/5 px-4 py-3 rounded-xl flex items-center gap-3 text-xs italic text-white/70 font-serif">
-                      <span className="text-[#C9A84C] text-lg font-bold leading-none font-serif">“</span>
-                      <span>Porque cual es su pensamiento en su corazón, tal es él. — Proverbios 23:7</span>
-                    </div>
-
-                    <div className="bg-[#121212] border border-[#C9A84C]/30 p-4 rounded-2xl flex items-start gap-3 text-xs text-white/80">
-                      <div className="p-2 rounded-xl bg-[#C9A84C]/15 border border-[#C9A84C]/30 text-[#C9A84C] flex-shrink-0 mt-0.5">
-                        <Compass className="w-4 h-4 text-[#C9A84C]" />
-                      </div>
-                      <div className="space-y-1">
-                        <span className="text-[10px] font-mono uppercase tracking-widest text-[#C9A84C] font-bold block">
-                          Principio Fundamental • Regla Pastoral de Oro
-                        </span>
-                        <p className="text-[11px] text-white/70 leading-relaxed font-sans italic">
-                          «La herramienta no pretende decirle al consejero quién es la persona. Pretende ayudarle a hacer mejores preguntas para comprender cómo esa persona está interpretando sus circunstancias, qué está buscando, qué teme, cómo responde y dónde necesita ser redirigida hacia la verdad de Dios y la suficiencia de Cristo.»
-                        </p>
-                        <div className="flex items-center gap-2 pt-1 text-[10px] font-mono text-[#C9A84C]">
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#C9A84C]" />
-                          <span>La meta no es producir una etiqueta; es producir un mapa de comprensión y una dirección de ayuda.</span>
-                        </div>
-                      </div>
-                    </div>
-
                   </div>
 
-                  {/* Right Column: Profile Gate Form & Action (span 5) */}
-                  <div className="lg:col-span-5">
-                    <form 
-                      id="gate-form" 
-                      onSubmit={handleStartScreening} 
-                      className="bg-[#161616]/90 border border-[#C9A84C]/25 p-6 sm:p-7 rounded-[24px] shadow-2xl relative overflow-hidden space-y-6"
+                  <div className="flex items-start gap-2.5 bg-[#202020]/20 p-3.5 rounded-xl border border-white/5">
+                    <input
+                      type="checkbox"
+                      id="opt-terms"
+                      checked={acceptedTerms}
+                      onChange={(e) => setAcceptedTerms(e.target.checked)}
+                      className="mt-1 w-4 h-4 cursor-pointer accent-[#C9A84C] rounded border-white/10"
+                    />
+                    <label htmlFor="opt-terms" className="text-[11px] text-white/45 leading-normal cursor-pointer select-none">
+                      Acepto que mis respuestas se guarden solo en mi dispositivo para mi autoexamen.
+                    </label>
+                  </div>
+
+                  <button
+                    type="submit"
+                    id="btn-gate-start"
+                    disabled={!acceptedTerms}
+                    className="w-full relative group overflow-hidden bg-gradient-to-r from-[#C9A84C] to-yellow-600 disabled:from-gray-700 disabled:to-gray-800 disabled:text-white/40 disabled:pointer-events-none text-[#0D0D0D] font-bold py-4 px-6 rounded-xl hover:shadow-[0_0_25px_rgba(201,168,76,0.35)] hover:scale-[1.01] transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <span className="relative z-10 text-sm tracking-wide">Comenzar mi autoexamen</span>
+                    <ArrowRight className="w-4 h-4 relative z-10 transition-transform group-hover:translate-x-1" />
+                    <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </button>
+
+                  {SHOW_TEST_TOOLS && (
+                    <button
+                      type="button"
+                      onClick={handleLoadSimulatedCase19}
+                      className="w-full bg-[#181818] hover:bg-[#222222] border border-[#C9A84C]/40 text-[#C9A84C] font-mono text-xs font-bold py-3 px-4 rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer"
                     >
-                      {/* Decorative Gold flare blur inside the card */}
-                      <div className="absolute -right-16 -top-16 w-32 h-32 rounded-full bg-[#C9A84C]/10 blur-2xl pointer-events-none" />
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>PROBAR CASO REAL SIMULADO (Control 5, Tiempo 5)</span>
+                    </button>
+                  )}
 
-                      <div className="space-y-1.5">
-                        <span className="text-[10px] tracking-[0.25em] font-mono text-[#C9A84C]/80 block uppercase font-bold">Puerta de Acceso</span>
-                        <h3 className="text-lg font-bold text-white tracking-tight">Prepara tu Perfil de Exploración</h3>
-                        <p className="text-xs text-white/50 leading-relaxed">
-                          Introduce tus datos confidenciales para mapear tus interpretaciones, deseos y temores hacia la verdad de Dios y la suficiencia de Cristo.
-                        </p>
-                      </div>
-
-                      {/* Input fields */}
-                      <div className="space-y-4">
-                        <div className="space-y-1.5">
-                          <label className="text-xs text-[#C9A84C] font-mono uppercase tracking-wider font-semibold flex items-center gap-1.5">
-                            <User className="w-3.5 h-3.5" /> Nombre o Pseudónimo
-                          </label>
-                          <div className="relative">
-                            <input 
-                              type="text" 
-                              required
-                              value={userName}
-                              onChange={(e) => setUserName(e.target.value)}
-                              placeholder="Ej. María o Samuel" 
-                              className="w-full bg-[#202020] border border-white/5 rounded-xl pl-4 pr-4 py-3 text-sm focus:outline-none focus:border-[#C9A84C] text-white transition-all focus:bg-[#252525] placeholder:text-white/20"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="space-y-1.5">
-                          <label className="text-xs text-[#C9A84C] font-mono uppercase tracking-wider font-semibold flex items-center gap-1.5">
-                            <Mail className="w-3.5 h-3.5" /> Correo Electrónico
-                          </label>
-                          <div className="relative">
-                            <input 
-                              type="email" 
-                              required
-                              value={userEmail}
-                              onChange={(e) => setUserEmail(e.target.value)}
-                              placeholder="correo@ejemplo.com" 
-                              className="w-full bg-[#202020] border border-white/5 rounded-xl pl-4 pr-4 py-3 text-sm focus:outline-none focus:border-[#C9A84C] text-white transition-all focus:bg-[#252525] placeholder:text-white/20"
-                            />
-                          </div>
-                        </div>
-
-                        {/* Age and Main Goal Grid to keep compact layout */}
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                          <div className="space-y-1.5 sm:col-span-1">
-                            <label className="text-xs text-[#C9A84C] font-mono uppercase tracking-wider font-semibold flex items-center gap-1.5">
-                              <Calendar className="w-3.5 h-3.5" /> Edad
-                            </label>
-                            <input 
-                              type="number" 
-                              required
-                              min="1"
-                              max="120"
-                              value={userAge}
-                              onChange={(e) => setUserAge(e.target.value)}
-                              placeholder="Años" 
-                              className="w-full bg-[#202020] border border-white/5 rounded-xl pl-4 pr-4 py-3 text-sm focus:outline-none focus:border-[#C9A84C] text-white transition-all focus:bg-[#252525]"
-                            />
-                          </div>
-
-                          <div className="space-y-1.5 sm:col-span-2">
-                            <label className="text-xs text-[#C9A84C] font-mono uppercase tracking-wider font-semibold flex items-center gap-1.5">
-                              <Compass className="w-3.5 h-3.5" /> Objetivo Principal
-                            </label>
-                            <select 
-                              required
-                              value={userGoal}
-                              onChange={(e) => setUserGoal(e.target.value)}
-                              className="w-full bg-[#202020] border border-white/5 rounded-xl px-3 py-3 text-sm focus:outline-none focus:border-[#C9A84C] text-white transition-all"
-                            >
-                              <option value="" disabled>Selecciona tu misión...</option>
-                              <option value="Superar el autosabotaje y procrastinación">Superar el autosabotaje</option>
-                              <option value="Sanar mi valor personal e identidad">Sanar mi valor personal</option>
-                              <option value="Romper el pánico al fracaso y perfeccionismo">Romper el pánico al fracaso</option>
-                              <option value="Alinear mis finanzas con la abundancia">Alinear mis finanzas</option>
-                              <option value="Integrar sanamente mis relaciones">Integrar mis relaciones</option>
-                              <option value="Vivir sin culpa de descanso y autoreproche">Descansar sin culpa</option>
-                              <option value="Descubrir mi propósito de vida y Reino">Descubrir mi propósito</option>
-                            </select>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Dynamic Responsive Character Badge Preview */}
-                      <div className="bg-[#0A0A0A] border border-[#C9A84C]/15 rounded-2xl p-4 space-y-2 relative overflow-hidden transition-all hover:border-[#C9A84C]/35">
-                        <div className="absolute right-2 top-2 text-[#C9A84C]/10 pointer-events-none">
-                          <Compass className="w-16 h-16" />
-                        </div>
-                        <span className="text-[9px] tracking-[0.2em] font-mono text-[#C9A84C] block uppercase font-bold">FICHA DE CERTIFICACIÓN TEMPORAL</span>
-                        <div className="flex justify-between items-center">
-                          <div>
-                            <h4 className="text-sm font-bold text-white font-serif">{userName ? `Explorador ${userName}` : 'Explorador sin nombre'}</h4>
-                            <p className="text-[10px] text-white/50">{userAge ? `${userAge} años` : 'Edad no definida'} • Misión: {userGoal ? userGoal : 'Encontrar la verdad'}</p>
-                          </div>
-                          <div className="text-right">
-                            <span className="text-[10px] font-bold bg-[#C9A84C]/10 text-[#C9A84C] border border-[#C9A84C]/20 px-2 py-0.5 rounded-full font-mono">Nivel 1: Primera mirada</span>
-                          </div>
-                        </div>
-                        <div className="w-full bg-white/5 h-1 rounded-full overflow-hidden mt-1">
-                          <div className="bg-[#C9A84C] h-full w-[25%]" />
-                        </div>
-                        <p className="text-[9px] text-white/30 italic">✓ +25 puntos iniciales serán otorgados al iniciar la exploración.</p>
-                      </div>
-
-                      {/* Terms Acceptance */}
-                      <div className="flex items-start gap-2.5 bg-[#202020]/20 p-3.5 rounded-xl border border-white/5">
-                        <input 
-                          type="checkbox" 
-                          id="opt-terms" 
-                          checked={acceptedTerms}
-                          onChange={(e) => setAcceptedTerms(e.target.checked)}
-                          className="mt-1 w-4 h-4 cursor-pointer accent-[#C9A84C] rounded border-white/10" 
-                        />
-                        <label htmlFor="opt-terms" className="text-[11px] text-white/45 leading-normal cursor-pointer select-none">
-                          Autorizo registrar mis respuestas de forma segura y descargo la responsabilidad en pro del autoconocimiento.
-                        </label>
-                      </div>
-
-                      {/* Primary GRAND CTA Button */}
-                      <button 
-                        type="submit"
-                        id="btn-gate-start"
-                        disabled={!acceptedTerms}
-                        className="w-full relative group overflow-hidden bg-gradient-to-r from-[#C9A84C] to-yellow-600 disabled:from-gray-700 disabled:to-gray-800 disabled:text-white/40 disabled:pointer-events-none text-[#0D0D0D] font-bold py-4 px-6 rounded-xl hover:shadow-[0_0_25px_rgba(201,168,76,0.35)] hover:scale-[1.01] transition-all flex items-center justify-center gap-2 cursor-pointer"
-                      >
-                        <span className="relative z-10 text-sm tracking-wide">Descubrir mi mapa de exploración interior</span>
-                        <ArrowRight className="w-4 h-4 relative z-10 transition-transform group-hover:translate-x-1" />
-                        <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
-                      </button>
-
-                      {/* Botón de Simulación de Prueba Rápida (Prompt 19) */}
-                      {SHOW_TEST_TOOLS && (
-                        <button
-                          type="button"
-                          onClick={handleLoadSimulatedCase19}
-                          className="w-full bg-[#181818] hover:bg-[#222222] border border-[#C9A84C]/40 text-[#C9A84C] font-mono text-xs font-bold py-3 px-4 rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer"
-                        >
-                          <Sparkles className="w-3.5 h-3.5" />
-                          <span>PROBAR CASO REAL SIMULADO (Control 5, Tiempo 5)</span>
-                        </button>
-                      )}
-
-                      {/* Supportive Info Badge List (Structured layout) */}
-                      <div className="grid grid-cols-2 gap-3 pt-3.5 border-t border-white/5">
-                        <div className="flex items-center gap-2 text-white/70">
-                          <Clock className="w-4 h-4 text-[#C9A84C] flex-shrink-0" />
-                          <span className="text-[11px] leading-tight font-medium">⏱ Duración: 8 a 12 minutos</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-white/70">
-                          <Activity className="w-4 h-4 text-[#C9A84C] flex-shrink-0" />
-                          <span className="text-[11px] leading-tight font-medium">📊 Mapa de comprensión</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-white/70">
-                          <Brain className="w-4 h-4 text-[#C9A84C] flex-shrink-0" />
-                          <span className="text-[11px] leading-tight font-medium">🧠 Patrones cognitivos</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-white/70">
-                          <BookOpen className="w-4 h-4 text-[#C9A84C] flex-shrink-0" />
-                          <span className="text-[11px] leading-tight font-medium">📖 Principios bíblicos</span>
-                        </div>
-                      </div>
-
-                      <div className="text-center text-white/35 text-[10px] font-mono uppercase tracking-wider pt-1">
-                        🔒 Privacidad total y cifrado local
-                      </div>
-                    </form>
-                  </div>
-
-                </div>
-
+                  <p className="text-center text-white/35 text-[10px] font-mono uppercase tracking-wider">
+                    🔒 Privacidad total y cifrado local
+                  </p>
+                </form>
               </motion.div>
             )}
 
@@ -2026,8 +1899,8 @@ export default function App() {
                             </div>
 
                             <div className="space-y-0.5 mt-2">
-                              <h4 className="text-[11px] font-bold text-white leading-tight font-sans tracking-tight">{reg.title}</h4>
-                              <p className="text-[9px] text-white/40 line-clamp-1">{reg.desc}</p>
+                              <h4 className="text-[11px] font-bold text-white leading-tight font-sans tracking-tight">Región {idx + 1}</h4>
+                              <p className="text-[9px] text-white/40 line-clamp-1">Área por explorar</p>
                             </div>
 
                             {/* Node Status Badge */}
@@ -2071,9 +1944,6 @@ export default function App() {
                           })()}
                         </div>
                         <div>
-                          <h4 className="text-white font-bold text-sm tracking-tight font-sans">
-                            {bloquesDiagnostico[currentSelectedRegion as keyof typeof bloquesDiagnostico]?.title || 'Capacidad & Identidad'}
-                          </h4>
                           <span className="text-[10px] font-mono text-[#C9A84C] uppercase tracking-widest font-semibold block">Rastreo de Activación</span>
                         </div>
                       </div>
@@ -2087,15 +1957,7 @@ export default function App() {
                         <div className="space-y-1">
                           <span className="text-[9px] uppercase font-mono tracking-wider text-[#C9A84C] font-bold">Consejería del Territorio</span>
                           <p className="text-xs text-white/80 italic leading-relaxed font-sans">
-                            {currentSelectedRegion === 'capacidad-identidad' && `Hola ${userName}, descifremos la fortaleza de mentira de la incapacidad. ¿Temes no estar a la altura en público?`}
-                            {currentSelectedRegion === 'merecimiento-vinculo' && `Comprendo el temor, ${userName}. Siguiente paso: ¿aguarda tu mente que un rechazo o catástrofe imprevista ocurra para cobrarte facturas?`}
-                            {currentSelectedRegion === 'control-entorno' && `Analicemos qué tan obsesivo se vuelve el deseo de dominar lo incontrolable pretendiendo sostener todo en tus manos.`}
-                            {currentSelectedRegion === 'rendimiento-logro' && `Evaluemos si condicionas el valor intrínseco de tu alma a la acumulación y volumen de tus trofeos terrenales, ${userName}.`}
-                            {currentSelectedRegion === 'relaciones-poder' && `Indaguemos en el pánico a ser vulnerable o a colocar fronteras de paz en tus relaciones cotidianas por temor de abandono.`}
-                            {currentSelectedRegion === 'cuerpo-salud' && `Detrás de tu cansancio físico prolongado, ¿por qué sientes que reposar sin culpabilidad es un pecado del cual arrepentirse?`}
-                            {currentSelectedRegion === 'espiritualidad-trascendencia' && `¿Vivencias verdaderamente una filiación de gracia o percibes la lejanía divina como un veredicto frío?`}
-                            {currentSelectedRegion === 'tiempo-futuro' && `El tiempo corre. ¿Te paralizas ante la idea de tomar una sendera irreversible sintiendo escasez de oportunidades?`}
-                            {currentSelectedRegion === 'genero-identidad-social' && `¿Consideras que tus marcas heredadas de cuna o demográficas limitan eternamente tu unción de gracia?`}
+                            Responde con honestidad, {userName}: ¿cuánto resuena contigo esta afirmación?
                           </p>
                         </div>
                       </div>
@@ -2287,8 +2149,8 @@ export default function App() {
                     </div>
                     <div className="h-8 w-[1px] bg-white/10" />
                     <div className="text-right font-mono">
-                      <span className="text-white/40 text-[10px] block font-bold uppercase">Sectores Abismales</span>
-                      <span className="text-[#C9A84C] font-bold text-xs">{activeBlocks.length} Bloques Detectados</span>
+                      <span className="text-white/40 text-[10px] block font-bold uppercase">Exploración</span>
+                      <span className="text-[#C9A84C] font-bold text-xs">En curso</span>
                     </div>
                   </div>
                 </div>
@@ -2310,10 +2172,6 @@ export default function App() {
                         "{deepDiveQuestions[deepDiveIndex]?.afirmacionTest}"
                       </h3>
 
-                      <div className="inline-flex items-center gap-2 bg-[#C9A84C]/10 border border-[#C9A84C]/10 px-4 py-1.5 rounded-full text-xs text-[#C9A84C] font-semibold w-fit mx-auto self-center">
-                        <Lock className="w-3.5 h-3.5" />
-                        <span>Sectores: {deepDiveQuestions[deepDiveIndex]?.bloque}</span>
-                      </div>
                     </div>
 
                     {/* Highly Stylized Heart Dial responses */}
@@ -2419,7 +2277,6 @@ export default function App() {
                         <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
                           {activeBlocks.map((blockId, idx) => {
                             const isCurrent = deepDiveQuestions[deepDiveIndex]?.bloqueId === blockId;
-                            const blockName = bloquesDiagnostico[blockId as keyof typeof bloquesDiagnostico]?.title || blockId;
                             
                             // Check if this block questions have been answered or are being answered
                             // All questions for this block that have index < deepDiveIndex
@@ -2454,7 +2311,7 @@ export default function App() {
                                   </div>
                                 )}
                                 <div className="space-y-0.5">
-                                  <h5 className="text-[11px] font-bold text-white font-sans">{blockName}</h5>
+                                  <h5 className="text-[11px] font-bold text-white font-sans">Sector {idx + 1}</h5>
                                   <span className="text-[8px] uppercase font-mono tracking-wider text-white/35 block font-bold">
                                     {isCompleted ? 'Derrumbado' : isCurrent ? 'Sondeando...' : 'Bloqueado'}
                                   </span>
@@ -2494,7 +2351,6 @@ export default function App() {
                 mode="stage"
                 stageQuestion={HEART_STAGE_QUESTIONS[stageIndex]}
                 selectedOptions={stageAnswers[HEART_STAGE_QUESTIONS[stageIndex]?.id] || []}
-                dominantAreaTitle={primaryBlock.title}
                 userXp={userXp}
                 getExploradorLevel={getExploradorLevel}
                 onToggleOption={handleToggleStageOption}
@@ -2576,6 +2432,58 @@ export default function App() {
               </motion.div>
             )}
 
+            {/* PASO DE DESEMPATE: varias creencias empataron en el puntaje máximo.
+                La app no elige por orden de lista: la persona elige cuál le describe mejor. */}
+            {step === 'tiebreak' && (
+              <motion.div
+                key="tiebreak-pane"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="max-w-2xl mx-auto py-10 space-y-6"
+              >
+                <div className="text-center space-y-3">
+                  <span className="text-[#C9A84C] font-mono text-xs uppercase tracking-[0.2em] font-semibold block">
+                    Última pregunta antes de tu resultado
+                  </span>
+                  <h3 className="text-2xl sm:text-3xl font-bold font-display text-white">
+                    Varias creencias resonaron con la misma fuerza
+                  </h3>
+                  <p className="text-white/60 text-sm leading-relaxed max-w-lg mx-auto">
+                    Tus respuestas apuntan con igual intensidad a más de una creencia.
+                    Para que tu resultado sea realmente tuyo, dime cuál de estas
+                    afirmaciones te describe mejor hoy:
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  {tiebreakCandidates.map((candidate) => (
+                    <button
+                      key={candidate.id}
+                      onClick={() => chooseTiebreakBelief(candidate.id)}
+                      className="w-full text-left bg-[#161616] hover:bg-[#1E1E1E] border border-white/10 hover:border-[#C9A84C]/50 p-5 rounded-2xl transition-all cursor-pointer space-y-2"
+                    >
+                      <span className="text-white/60 text-sm italic leading-relaxed block">
+                        “{candidate.afirmacionTest}”
+                      </span>
+                      <span className="text-[#C9A84C] text-xs font-bold block pt-1">
+                        Esta es la que más me describe →
+                      </span>
+                    </button>
+                  ))}
+                </div>
+
+                <div className="text-center">
+                  <button
+                    onClick={() => tiebreakCandidates.length > 0 && chooseTiebreakBelief(tiebreakCandidates[0].id)}
+                    className="text-[11px] text-white/40 hover:text-white/70 underline cursor-pointer"
+                  >
+                    No estoy seguro/a, elige por mí
+                  </button>
+                </div>
+              </motion.div>
+            )}
+
             {/* STEP 6: CLINICAL & DEVOTIONAL RESULTS DETAILED */}
             {step === 'results' && !isUnveiled && (
               <motion.div
@@ -2649,1380 +2557,117 @@ export default function App() {
                 transition={{ duration: 0.5 }}
                 className="space-y-10"
               >
-                {/* Empathetic Greeting with custom names */}
-                <div className="text-center space-y-3">
-                  <span className="text-[#C9A84C] font-mono text-xs uppercase tracking-[0.2em] font-semibold block">REPORTE PERSONALIZADO EXPEDIDO PARA</span>
+                {/* TU REPORTE: pequeño y concreto */}
+                <div className="text-center space-y-2">
+                  <span className="text-[#C9A84C] font-mono text-xs uppercase tracking-[0.2em] font-semibold block">Tu reporte</span>
                   <h2 className="text-3xl sm:text-4xl font-bold font-display text-white">{userName}</h2>
-                  <div className="flex justify-center pb-2">
-                    <span className="bg-white/5 border border-white/5 px-3 py-1 rounded-full text-xs text-white/50 font-mono">{userEmail}</span>
-                  </div>
+                  <p className="text-white/60 text-xs sm:text-sm max-w-md mx-auto leading-relaxed">
+                    Esto es lo que tu autoexamen encontró: tu creencia principal y tu plan para romperla.
+                  </p>
                 </div>
 
-                {/* Dashboard Stats (Toca los 3 pilares) */}
-                <div id="stats-grid" className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="bg-[#141414] border border-white/5 p-5 rounded-2xl text-center">
-                    <span className="text-3xl font-bold text-[#C9A84C] block mb-1">{stats.totalToTransform}</span>
-                    <span className="text-[10px] text-white/40 uppercase tracking-widest font-mono block">Creencias Limitadoras</span>
+                <div className="bg-[#141414] border border-[#C9A84C]/25 p-6 sm:p-8 rounded-3xl space-y-5">
+                  <div className="space-y-1 text-center">
+                    <span className="text-[10px] text-[#C9A84C] font-mono uppercase tracking-widest font-bold block">Tu creencia principal</span>
+                    <h3 className="text-xl sm:text-2xl font-bold font-display text-white">
+                      {results[0]?.alias || 'Tu creencia limitante'}
+                    </h3>
+                    <p className="text-white/70 text-sm leading-relaxed">{results[0]?.creencia}</p>
                   </div>
-                  <div className="bg-[#141414] border border-white/5 p-5 rounded-2xl text-center col-span-1">
-                    <span className="text-3xl font-bold text-emerald-400 block mb-1">
-                      {Object.values(completedDays).filter(Boolean).length} / 30
-                    </span>
-                    <span className="text-[10px] text-white/40 uppercase tracking-widest font-mono block">Días Completados</span>
-                  </div>
-                  <div className="bg-[#141414] border border-white/5 p-5 rounded-2xl text-center">
-                    <span className="text-3xl font-bold text-indigo-400 block mb-1">{stats.focusAreas}</span>
-                    <span className="text-[10px] text-white/40 uppercase tracking-widest font-mono block">Sectores Activados</span>
-                  </div>
-                </div>
 
-                {/* Interactive premium 5-tab workspace selection bar */}
-                <div className="flex flex-wrap gap-2 justify-center border-b border-white/5 pb-4 mb-8">
-                  {[
-                    { id: 0, label: "📊 Fase 1 y 2: Diagnóstico" },
-                    { id: 1, label: "📖 Fase 3 y 4: Renovación" },
-                    { id: 2, label: "🗓️ Fase 5 y 6: Itinerario 30 Días" },
-                    { id: 3, label: "📈 Fase 7: Registro Progreso" },
-                    { id: 4, label: "🎓 Fase 8: Clausura & Reporte" }
-                  ].map((tab) => (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveTab(tab.id)}
-                      className={`px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm tracking-wide cursor-pointer transition-all ${
-                        activeTab === tab.id
-                          ? 'bg-[#C9A84C] text-[#0D0D0D] shadow-lg shadow-[#C9A84C]/10 hover:scale-[1.02]'
-                          : 'bg-[#181818] border border-white/5 text-white/60 hover:text-white hover:border-white/10'
-                      }`}
-                    >
-                      {tab.label}
-                    </button>
-                  ))}
-                </div>
-
-                {copiedNotification && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    className="p-3 text-center rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-sm font-semibold max-w-md mx-auto"
-                  >
-                    {copiedNotification}
-                  </motion.div>
-                )}
-
-                {/* TAB 0: 📊 Fase 1 y 2: Identificación y Diagnóstico del Sistema Cognitivo */}
-                {activeTab === 0 && (() => {
-                  const primaryGuide = practicalStepsByBlock[primaryBlock.id] || practicalStepsByBlock['control-entorno'];
-                  const displayBelief = results[0]?.afirmacionTest
-                    ? `Posible patrón a contrastar: «${results[0].afirmacionTest}»`
-                    : (aiDiagnosis?.fase1?.principalBelief || "Búsqueda involuntaria de seguridad por esfuerzo propio");
-
-                  const tiedHypotheses = (() => {
-                    if (!results || results.length < 2) return [];
-                    const score0 = (screeningAnswers[results[0].bloqueId] || 1) * 10 + (results[0].intensity || 1);
-                    const ties = [results[0]];
-                    for (let i = 1; i < results.length; i++) {
-                      const scoreI = (screeningAnswers[results[i].bloqueId] || 1) * 10 + (results[i].intensity || 1);
-                      if (scoreI === score0 && results[i].bloqueId !== results[0].bloqueId) {
-                        ties.push(results[i]);
-                        break;
-                      }
-                    }
-                    return ties.length > 1 ? ties : [];
-                  })();
-
-                  const cleanWhatsapp = whatsappNumber.replace(/[^0-9]/g, '');
-                  const isAllHealthy = dominantBlocks.length > 0 && dominantBlocks[0].score <= 2;
-                  const expData = aiDiagnosis?.exploratorio;
-
-                  const confirmedHeartCount = Object.values(confirmedHeartSteps).filter(Boolean).length;
-                  const heartNote = confirmedHeartCount > 0 ? ` Además, validé ${confirmedHeartCount} hipótesis en mi mapa del corazón.` : '';
-                  const confirmedInteractionsCount = Object.values(validatedInteractions).filter(Boolean).length;
-                  const interactionNote = confirmedInteractionsCount > 0 ? ` e identifiqué ${confirmedInteractionsCount} interacción(es) activa(s) entre mis dimensiones.` : '';
-
-                  const whatsappMsg = selectedHypothesis 
-                    ? `Hola, completé la autoexploración Qué me detiene en Levántate Resplandece. Mi área de exploración principal fue ${primaryBlock.title} (${primaryBlock.score}/5), y la hipótesis con la que más me identifiqué fue: "${selectedHypothesis}".${heartNote}${interactionNote} Quisiera agendar una sesión de acompañamiento pastoral.`
-                    : `Hola, completé la autoexploración Qué me detiene en Levántate Resplandece. Mi área de exploración principal fue ${primaryBlock.title} (${primaryBlock.score}/5).${heartNote}${interactionNote} Quisiera agendar una sesión de acompañamiento pastoral.`;
-
-                  return (
-                    <motion.div
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      className="space-y-8"
-                    >
-                      {/* MAPA DE EXPLORACIÓN DEL CORAZÓN (PROMPTS 5-19) */}
-                      <HeartExplorationSection
-                        mapData={aiDiagnosis?.heartExplorationMap}
-                        counselingPlan={aiDiagnosis?.counselingPlan}
-                        discernment={aiDiagnosis?.pastoralDiscernment}
-                        fidelityCheck={aiDiagnosis?.fidelityCheck}
-                        centralQuestion={aiDiagnosis?.centralSessionQuestion}
-                        behavioralTask={aiDiagnosis?.behavioralTask}
-                        userName={userName || 'Aconsejado'}
-                        onLoadCase19={handleLoadSimulatedCase19}
-                        isSimulatedCase19={isSimulatedCase19}
-                        showTestTools={SHOW_TEST_TOOLS}
-                        stageSummary={stageSummary}
-                      />
-
-                      {/* BANNER METODOLÓGICO: FILOSOFÍA DE EXPLORACIÓN Y DISCERNIMIENTO */}
-                      <div className="bg-gradient-to-r from-amber-950/25 via-[#161616] to-amber-950/15 border border-[#C9A84C]/30 p-5 sm:p-6 rounded-3xl relative overflow-hidden">
-                        <div className="flex items-start gap-4">
-                          <div className="w-10 h-10 rounded-2xl bg-[#C9A84C]/15 border border-[#C9A84C]/30 flex items-center justify-center text-[#C9A84C] flex-shrink-0 mt-0.5">
-                            <Compass className="w-5 h-5 text-[#C9A84C]" />
-                          </div>
-                          <div className="space-y-1.5 text-xs">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className="text-[11px] font-mono uppercase tracking-widest text-[#C9A84C] font-bold">
-                                Modelo de Discernimiento Pastoral
-                              </span>
-                              <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-[#C9A84C]/10 text-[#C9A84C] border border-[#C9A84C]/25 font-bold">
-                                DATOS → PATRONES → HIPÓTESIS → VALIDACIÓN → AYUDA
-                              </span>
-                            </div>
-                            <p className="text-white/85 leading-relaxed">
-                              <strong>Principio Fundamental:</strong> «La herramienta no pretende decirle al consejero quién es la persona. Pretende ayudarle a hacer mejores preguntas para comprender cómo esa persona está interpretando sus circunstancias, qué está buscando, qué teme, cómo responde y dónde necesita ser redirigida hacia la verdad de Dios y la suficiencia de Cristo.»
-                            </p>
-                            <p className="text-[#C9A84C] font-mono text-[11px] pt-0.5">
-                              La meta no es producir una etiqueta. La meta es producir un mapa de comprensión y una dirección de ayuda.
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* CONDICIONAL: PERFIL SANO vs PERFIL CON DETECCIÓN */}
-                      {isAllHealthy ? (
-                        <div className="border bg-gradient-to-br from-[#0F1D14] via-[#121A15] to-[#0D1410] border-emerald-500/30 p-6 sm:p-8 rounded-3xl relative overflow-hidden text-white/90 shadow-2xl space-y-5">
-                          <div className="flex items-center gap-2 text-emerald-400">
-                            <Shield className="w-6 h-6 text-emerald-400" />
-                            <span className="text-xs font-mono uppercase font-bold tracking-wider">
-                              Perfil de Estabilidad y Paz Interior (Todos los bloques ≤ 2/5)
-                            </span>
-                          </div>
-                          
-                          <div className="space-y-2">
-                            <h3 className="text-xl sm:text-2xl font-bold font-display text-white">
-                              ¡Damos gracias a Dios! Tus respuestas reflejan una temporada de equilibrio y descanso.
-                            </h3>
-                            <p className="text-sm text-emerald-200/80 leading-relaxed font-sans">
-                              Ninguno de los 9 bloques supera el umbral de activación. El puntaje máximo registrado fue de {primaryBlock.score}/5 en {primaryBlock.title}.
-                            </p>
-                          </div>
-
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-                            <div className="bg-black/30 border border-emerald-500/20 p-4 rounded-2xl space-y-1.5">
-                              <span className="text-[10px] font-mono uppercase tracking-wider text-emerald-400 font-bold block">
-                                1. DATO OBSERVABLE
-                              </span>
-                              <p className="text-xs text-white/80 leading-relaxed">
-                                Respuestas con baja frecuencia de tensión, control o rumiación en los 9 bloques examinados.
-                              </p>
-                            </div>
-
-                            <div className="bg-black/30 border border-emerald-500/20 p-4 rounded-2xl space-y-1.5">
-                              <span className="text-[10px] font-mono uppercase tracking-wider text-emerald-400 font-bold block">
-                                2. PATRÓN OBSERVABLE
-                              </span>
-                              <p className="text-xs text-white/80 leading-relaxed">
-                                Buena autorregulación emocional, límites sanos y capacidad de descanso frente a las demandas cotidianas.
-                              </p>
-                            </div>
-
-                            <div className="bg-black/30 border border-emerald-500/20 p-4 rounded-2xl space-y-1.5">
-                              <span className="text-[10px] font-mono uppercase tracking-wider text-emerald-400 font-bold block">
-                                3. HIPÓTESIS DE TRABAJO
-                              </span>
-                              <p className="text-xs text-white/80 leading-relaxed">
-                                Podrías estar viviendo una temporada de madurez y consolidación espiritual, o bien respondiste desde un período con pocos detonantes activos.
-                              </p>
-                            </div>
-
-                            <div className="bg-black/30 border border-emerald-500/20 p-4 rounded-2xl space-y-1.5">
-                              <span className="text-[10px] font-mono uppercase tracking-wider text-emerald-400 font-bold block">
-                                4. DIRECCIÓN DE AYUDA Y MAYORDOMÍA
-                              </span>
-                              <p className="text-xs text-white/80 leading-relaxed">
-                                Preservar la comunión íntima con Dios en gratitud, cuidar los tiempos de reposo y ser un canal de apoyo y mentoreo para quienes hoy atraviesan sobrecarga.
-                              </p>
-                            </div>
-                          </div>
-
-                          <div className="border-t border-emerald-500/20 pt-4">
-                            <span className="text-[10px] font-mono uppercase tracking-wider text-emerald-400 font-bold block mb-1">
-                              Pregunta para reflexionar en oración:
-                            </span>
-                            <p className="text-xs italic text-emerald-100/90 leading-relaxed">
-                              "¿Qué hábitos de fe o personas de apoyo te han ayudado a mantenerte en paz, y de qué forma puedes invertir esta serenidad para bendecir a otros?"
-                            </p>
-                          </div>
-                        </div>
-                      ) : (
-                        /* SECUENCIA DE EXPLORACIÓN COMPLETA PARA PERFILES CON ACTIVACIÓN */
-                        <div className="space-y-6">
-                          {/* SECCIÓN 1: DATO Y PATRÓN OBSERVABLES (LO QUE MÁS TE DETIENE) */}
-                          <div className="border bg-gradient-to-br from-[#1C1C1C] via-[#141414] to-[#0E0E0E] border-white/10 p-6 sm:p-8 rounded-3xl relative overflow-hidden text-white/90 shadow-2xl">
-                            <div className="absolute top-0 left-0 w-2 h-full bg-gradient-to-b from-[#C9A84C] to-amber-600" />
-                            
-                            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-                              <div className="flex items-center gap-2">
-                                <Flame className="w-4 h-4 text-[#C9A84C]" />
-                                <span className="text-xs text-[#C9A84C] font-mono uppercase font-bold tracking-wider">
-                                  Lo que más te detiene
-                                </span>
-                              </div>
-                              <div className="flex flex-wrap gap-2">
-                                {dominantBlocks.map((b) => (
-                                  <span 
-                                    key={b.id}
-                                    className={`text-xs font-mono font-bold px-3 py-1 rounded-full border ${
-                                      b.score >= 3 
-                                        ? 'bg-red-500/15 text-red-300 border-red-500/30' 
-                                        : 'bg-[#C9A84C]/15 text-[#C9A84C] border-[#C9A84C]/30'
-                                    }`}
-                                  >
-                                    {b.title}: {b.score}/5
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-
-                            {/* DATO OBSERVABLE */}
-                            <div className="space-y-2 mb-4 bg-black/30 border border-white/5 p-4 rounded-2xl">
-                              <span className="text-[10px] font-mono uppercase tracking-wider text-[#C9A84C] font-bold block">
-                                1. DATO OBSERVABLE (Reportado)
-                              </span>
-                              <p className="text-sm sm:text-base font-sans text-white/95 leading-relaxed font-medium">
-                                {expData?.dato?.descripcion || `Reportaste un puntaje de ${primaryBlock.score}/5 en el área de ${primaryGuide.blockTitle}. ${primaryGuide.dato}`}
-                              </p>
-                            </div>
-
-                            {/* PATRÓN CONDUCTUAL */}
-                            <div className="space-y-2 mb-4 bg-black/30 border border-white/5 p-4 rounded-2xl">
-                              <span className="text-[10px] font-mono uppercase tracking-wider text-[#C9A84C] font-bold block">
-                                2. PATRÓN CONDUCTUAL OBSERVABLE
-                              </span>
-                              <p className="text-sm font-sans text-white/90 leading-relaxed">
-                                {expData?.patron?.observacion || primaryGuide.patron}
-                              </p>
-                              <p className="text-xs text-white/50 italic pt-1">
-                                Nota metodológica: Este es el comportamiento manifestado. La raíz del corazón no es fija ni automática, sino que requiere discernimiento conjunto a la luz de las Escrituras.
-                              </p>
-                            </div>
-
-                            <div className="bg-black/50 border-l-2 border-[#C9A84C] p-3.5 rounded-r-xl text-xs text-white/80 leading-relaxed">
-                              <strong className="text-[#C9A84C] font-semibold">Causa de fondo a explorar: </strong>
-                              Tu necesidad de {primaryBlock.title} ({primaryBlock.score}/5) es la conducta que más te frena; {primaryGuide.rootExplanationHint}
-                            </div>
-                          </div>
-
-                          {/* SECCIÓN 2: HIPÓTESIS DE TRABAJO (No diagnósticos deterministas) */}
-                          <div className="border bg-[#161616] border-white/5 p-6 sm:p-8 rounded-3xl space-y-4">
-                            <div className="flex items-center gap-2 text-[#C9A84C]">
-                              <Sparkles className="w-5 h-5 text-[#C9A84C]" />
-                              <span className="text-xs font-mono uppercase font-bold tracking-wider">
-                                3. Hipótesis de Discernimiento (A contrastar, no etiquetas fijas)
-                              </span>
-                            </div>
-
-                            <p className="text-xs sm:text-sm text-white/70 leading-relaxed">
-                              Un puntaje de {primaryBlock.score}/5 en {primaryGuide.shortTitle} no define automáticamente quién eres ni sentencia tu corazón. Abre al menos tres hipótesis pastorales para examinar en oración:
-                            </p>
-
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
-                              {expData?.hipotesis && expData.hipotesis.length > 0 ? (
-                                expData.hipotesis.map((h: any, idx: number) => {
-                                  const isSelected = selectedHypothesis === h.titulo;
-                                  return (
-                                    <div 
-                                      key={idx}
-                                      onClick={() => setSelectedHypothesis(h.titulo)}
-                                      className={`p-4 rounded-2xl border transition-all cursor-pointer space-y-2 ${
-                                        isSelected 
-                                          ? 'bg-[#C9A84C]/15 border-[#C9A84C] shadow-lg shadow-[#C9A84C]/10' 
-                                          : 'bg-black/30 border-white/5 hover:border-white/20'
-                                      }`}
-                                    >
-                                      <div className="flex items-center justify-between">
-                                        <span className="text-[10px] font-mono uppercase tracking-wider font-bold text-[#C9A84C]">
-                                          Hipótesis {String.fromCharCode(65 + idx)}
-                                        </span>
-                                        {isSelected && (
-                                          <CheckCircle className="w-4 h-4 text-[#C9A84C]" />
-                                        )}
-                                      </div>
-                                      <h5 className="text-white text-xs font-bold">{h.titulo}</h5>
-                                      <p className="text-white/70 text-xs leading-relaxed">{h.descripcion}</p>
-                                    </div>
-                                  );
-                                })
-                              ) : (
-                                primaryGuide.hipotesis.map((hText, idx) => {
-                                  const [titlePart, ...descParts] = hText.split(': ');
-                                  const desc = descParts.join(': ') || hText;
-                                  const isSelected = selectedHypothesis === titlePart;
-
-                                  return (
-                                    <div 
-                                      key={idx}
-                                      onClick={() => setSelectedHypothesis(titlePart)}
-                                      className={`p-4 rounded-2xl border transition-all cursor-pointer space-y-2 ${
-                                        isSelected 
-                                          ? 'bg-[#C9A84C]/15 border-[#C9A84C] shadow-lg shadow-[#C9A84C]/10' 
-                                          : 'bg-black/30 border-white/5 hover:border-white/20'
-                                      }`}
-                                    >
-                                      <div className="flex items-center justify-between">
-                                        <span className="text-[10px] font-mono uppercase tracking-wider font-bold text-[#C9A84C]">
-                                          Hipótesis {String.fromCharCode(65 + idx)}
-                                        </span>
-                                        {isSelected && (
-                                          <CheckCircle className="w-4 h-4 text-[#C9A84C]" />
-                                        )}
-                                      </div>
-                                      <h5 className="text-white text-xs font-bold">{titlePart}</h5>
-                                      <p className="text-white/70 text-xs leading-relaxed">{desc}</p>
-                                    </div>
-                                  );
-                                })
-                              )}
-                            </div>
-
-                            {/* SECCIÓN 3: VALIDACIÓN PERSONAL INTERACTIVA */}
-                            <div className="bg-black/40 border border-[#C9A84C]/25 p-4 sm:p-5 rounded-2xl space-y-3 mt-4">
-                              <div className="flex items-center gap-2 text-xs font-mono font-bold text-[#C9A84C] uppercase tracking-wider">
-                                <CheckCircle className="w-4 h-4 text-[#C9A84C]" />
-                                4. Validación Personal: Tu discernimiento cuenta
-                              </div>
-                              <p className="text-xs text-white/80 leading-relaxed">
-                                {primaryGuide.validacionPrompt}
-                              </p>
-                              
-                              <div className="flex flex-wrap gap-2 pt-1">
-                                {['Hipótesis A', 'Hipótesis B', 'Hipótesis C', 'Otra opción / A discernir en consejería'].map((opt) => {
-                                  const isSelected = selectedHypothesis.includes(opt) || (opt === 'Otra opción / A discernir en consejería' && selectedHypothesis === 'Otra opción');
-                                  return (
-                                    <button
-                                      key={opt}
-                                      onClick={() => setSelectedHypothesis(opt === 'Otra opción / A discernir en consejería' ? 'Otra opción' : opt)}
-                                      className={`px-3 py-1.5 rounded-xl text-xs font-medium cursor-pointer transition-all ${
-                                        isSelected 
-                                          ? 'bg-[#C9A84C] text-[#0A0A0A] font-bold shadow-md shadow-[#C9A84C]/20' 
-                                          : 'bg-[#202020] border border-white/10 text-white/70 hover:text-white hover:border-white/25'
-                                      }`}
-                                    >
-                                      {opt}
-                                    </button>
-                                  );
-                                })}
-                              </div>
-
-                              {selectedHypothesis && (
-                                <p className="text-xs text-emerald-300 bg-emerald-950/20 border border-emerald-500/20 p-2.5 rounded-xl font-medium mt-2">
-                                  ✓ Has priorizado para tu proceso: <strong>{selectedHypothesis}</strong>. Esta línea será abordada de forma específica en tu tiempo de oración y acompañamiento.
-                                </p>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* SECCIÓN 4: PREGUNTAS POR EXPLORAR EN EL CORAZÓN */}
-                          <div className="border bg-[#161616] border-white/5 p-6 sm:p-8 rounded-3xl space-y-4">
-                            <div className="flex items-center gap-2 text-[#C9A84C]">
-                              <Compass className="w-5 h-5 text-[#C9A84C]" />
-                              <span className="text-xs font-mono uppercase font-bold tracking-wider">
-                                5. Preguntas para Explorar en Oración y Consejería
-                              </span>
-                            </div>
-                            <p className="text-xs text-white/60 leading-relaxed">
-                              Lleva estas preguntas a tu intimidad con Dios o a tu espacio de conversación pastoral. No busques respuestas apresuradas:
-                            </p>
-
-                            <div className="space-y-2.5 pt-1">
-                              {(expData?.preguntasPorExplorar || primaryGuide.preguntasPorExplorar).map((pregunta: string, idx: number) => (
-                                <div key={idx} className="bg-black/30 border border-white/5 p-3.5 rounded-xl flex items-start gap-3">
-                                  <span className="w-5 h-5 rounded-full bg-[#C9A84C]/10 border border-[#C9A84C]/30 flex items-center justify-center text-[#C9A84C] text-[11px] font-mono font-bold flex-shrink-0 mt-0.5">
-                                    {idx + 1}
-                                  </span>
-                                  <p className="text-xs sm:text-sm text-white/85 leading-relaxed font-medium">
-                                    {pregunta}
-                                  </p>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-
-                          {/* SECCIÓN 5: DIRECCIÓN DE AYUDA Y GRACIA */}
-                          <div className="border bg-gradient-to-br from-[#181818] via-[#141414] to-[#101010] border-white/10 p-6 sm:p-8 rounded-3xl space-y-3">
-                            <div className="flex items-center gap-2 text-[#C9A84C]">
-                              <Heart className="w-5 h-5 text-[#C9A84C]" />
-                              <span className="text-xs font-mono uppercase font-bold tracking-wider">
-                                6. Dirección de Ayuda y Restauración
-                              </span>
-                            </div>
-                            <p className="text-sm font-sans text-white/90 leading-relaxed">
-                              {expData?.direccionDeAyuda?.enfoque || primaryGuide.direccionDeAyuda}
-                            </p>
-                          </div>
-
-                          {/* SECCIÓN 7-NIVELES: NUEVO MODELO DE ANÁLISIS DEL CORAZÓN (CIRCUNSTANCIA → FRUTO) */}
-                          {(() => {
-                            const heartMap = aiDiagnosis?.mapaDelCorazon || primaryGuide?.heartMap;
-                            const heartStepsConfig = [
-                              {
-                                key: 'circunstancia',
-                                num: 1,
-                                title: 'CIRCUNSTANCIA',
-                                sub: 'Contexto detonante o demanda situacional',
-                                defaultType: 'sabemos' as const,
-                                data: heartMap?.circunstancia,
-                                icon: Calendar,
-                                defaultContent: `Enfrentar tareas complejas, decisiones compartidas o imprevistos vinculados con ${primaryBlock.title}.`,
-                                defaultJustif: 'Dato confirmado en tus respuestas: Puntuación destacada en el cuestionario.'
-                              },
-                              {
-                                key: 'interpretacion',
-                                num: 2,
-                                title: 'INTERPRETACIÓN',
-                                sub: 'Significado o sentencia interna que la mente le otorga',
-                                defaultType: 'explorar' as const,
-                                data: heartMap?.interpretacion,
-                                icon: Brain,
-                                defaultContent: '“Si no controlo cada detalle o si fallo, quedará demostrada mi insuficiencia ante los demás.”',
-                                defaultJustif: 'Hipótesis pastoral: Lectura cognitiva interna a contrastar en oración.'
-                              },
-                              {
-                                key: 'deseo',
-                                num: 3,
-                                title: 'DESEO / ANHELO',
-                                sub: 'Lo que el corazón anhela o intenta asegurar',
-                                defaultType: 'explorar' as const,
-                                data: heartMap?.deseo,
-                                icon: Heart,
-                                defaultContent: 'Seguridad previsible, orden blindado, ser considerado competente y tener paz sin sobresaltos.',
-                                defaultJustif: 'Hipótesis del corazón: Anhelo legítimo que se intenta garantizar por esfuerzo propio.'
-                              },
-                              {
-                                key: 'temor',
-                                num: 4,
-                                title: 'TEMOR',
-                                sub: 'La vulnerabilidad profunda que se busca evitar a toda costa',
-                                defaultType: 'explorar' as const,
-                                data: heartMap?.temor,
-                                icon: Shield,
-                                defaultContent: 'Quedar desprotegido ante la incertidumbre, ser expuesto como insuficiente o perder la aprobación.',
-                                defaultJustif: 'Hipótesis de raíz: Vulnerabilidad de fondo que se busca evitar a toda costa.'
-                              },
-                              {
-                                key: 'estrategiaControl',
-                                num: 5,
-                                title: 'ESTRATEGIA DE CONTROL',
-                                sub: 'Mecanismo humano y carnal de autoprotección',
-                                defaultType: 'explorar' as const,
-                                data: heartMap?.estrategiaControl,
-                                icon: Lock,
-                                defaultContent: 'Supervisión exhaustiva, rigidez, dificultad para delegar, sobreanálisis o hipervigilancia.',
-                                defaultJustif: 'Hipótesis de mecanismo: Estrategia de autoprotección empleada por la carne.'
-                              },
-                              {
-                                key: 'respuesta',
-                                num: 6,
-                                title: 'RESPUESTA',
-                                sub: 'Conducta manifiesta y síntoma observable reportado',
-                                defaultType: 'sabemos' as const,
-                                data: heartMap?.respuesta,
-                                icon: Activity,
-                                defaultContent: 'Asumir la carga total, postergar decisiones hasta que todo esté perfecto o replegarse a la defensiva.',
-                                defaultJustif: 'Dato confirmado en tus respuestas: Conducta y síntoma reportado en el test.'
-                              },
-                              {
-                                key: 'fruto',
-                                num: 7,
-                                title: 'FRUTO / CONSECUENCIA',
-                                sub: 'Impacto en paz, relaciones y oportunidades',
-                                defaultType: 'explorar' as const,
-                                data: heartMap?.fruto,
-                                icon: Flame,
-                                defaultContent: 'Fatiga mental, tensión vincular, ansiedad constante, postergación y pérdida del reposo en Dios.',
-                                defaultJustif: 'Hipótesis de consecuencia: Impacto en paz y relaciones para validar personalmente.'
-                              }
-                            ];
-
-                            const confirmedCount = Object.values(confirmedHeartSteps).filter(Boolean).length;
-
-                            return (
-                              <div className="border bg-gradient-to-b from-[#181818] via-[#121212] to-[#0D0D0D] border-white/10 p-6 sm:p-8 rounded-3xl relative overflow-hidden text-white/90 shadow-2xl space-y-6">
-                                {/* Header banner */}
-                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-5">
-                                  <div className="space-y-1">
-                                    <div className="flex items-center gap-2">
-                                      <Compass className="w-5 h-5 text-[#C9A84C]" />
-                                      <span className="text-xs text-[#C9A84C] font-mono uppercase font-bold tracking-wider">
-                                        Dinámica Bíblica del Corazón (7 Niveles)
-                                      </span>
-                                    </div>
-                                    <h3 className="text-lg sm:text-xl font-bold font-display text-white">
-                                      Modelo de Análisis del Corazón
-                                    </h3>
-                                    <p className="text-xs text-white/60 leading-relaxed max-w-2xl">
-                                      La conducta externa nace de las aguas profundas del corazón (Proverbios 4:23, Lucas 6:45). La aplicación construye este mapa distinguiendo estrictamente lo que es un dato directamente reportado de lo que proponemos como hipótesis para tu discernimiento.
-                                    </p>
-                                  </div>
-
-                                  <div className="bg-black/50 border border-white/10 px-4 py-2.5 rounded-2xl flex items-center gap-3 flex-shrink-0">
-                                    <div className="text-right">
-                                      <span className="text-[10px] font-mono uppercase tracking-wider text-white/40 block">Tus Validaciones</span>
-                                      <span className="text-xs font-bold text-[#C9A84C] font-mono">
-                                        {confirmedCount} de 5 hipótesis validadas
-                                      </span>
-                                    </div>
-                                    <div className="w-8 h-8 rounded-full bg-[#C9A84C]/15 border border-[#C9A84C]/30 flex items-center justify-center text-[#C9A84C]">
-                                      <Check className="w-4 h-4" />
-                                    </div>
-                                  </div>
-                                </div>
-
-                                {/* CRITICAL VISUAL DISTINCTION BAR: "Lo que sabemos" vs "Lo que estamos proponiendo explorar" */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 bg-black/40 border border-white/10 p-4 sm:p-5 rounded-2xl">
-                                  <div className="flex items-start gap-3 bg-emerald-950/25 border border-emerald-500/30 p-3.5 rounded-xl">
-                                    <div className="w-6 h-6 rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 flex-shrink-0 mt-0.5">
-                                      <CheckCircle className="w-3.5 h-3.5" />
-                                    </div>
-                                    <div className="space-y-1">
-                                      <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-emerald-300 block">
-                                        ✓ LO QUE SABEMOS
-                                      </span>
-                                      <p className="text-xs text-white/80 leading-relaxed">
-                                        <strong>Hechos y datos observables:</strong> Puntuaciones registradas y conductas que marcaste expresamente en el cuestionario (Circunstancia y Respuesta).
-                                      </p>
-                                    </div>
-                                  </div>
-
-                                  <div className="flex items-start gap-3 bg-amber-950/25 border border-[#C9A84C]/30 p-3.5 rounded-xl">
-                                    <div className="w-6 h-6 rounded-full bg-[#C9A84C]/20 border border-[#C9A84C]/40 flex items-center justify-center text-[#C9A84C] flex-shrink-0 mt-0.5">
-                                      <Search className="w-3.5 h-3.5" />
-                                    </div>
-                                    <div className="space-y-1">
-                                      <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-[#C9A84C] block">
-                                        🔍 LO QUE ESTAMOS PROPONIENDO EXPLORAR
-                                      </span>
-                                      <p className="text-xs text-white/80 leading-relaxed">
-                                        <strong>Hipótesis pastorales:</strong> Interpretaciones, anhelos internos, temores y consecuencias propuestas para orar y discernir. <em>Haz clic para confirmar las que resuenan contigo.</em>
-                                      </p>
-                                    </div>
-                                  </div>
-                                </div>
-
-                                {/* THE 7-STEP VERTICAL FLOW */}
-                                <div className="space-y-2 pt-1">
-                                  {heartStepsConfig.map((step, idx) => {
-                                    const isConfirmedByUser = !!confirmedHeartSteps[step.key];
-                                    const isFact = step.defaultType === 'sabemos';
-                                    const isExploration = !isFact;
-                                    const IconComponent = step.icon;
-                                    const stepContent = step.data?.contenido || step.defaultContent;
-                                    const stepJustif = step.data?.justificacion || step.defaultJustif;
-
-                                    return (
-                                      <React.Fragment key={step.key}>
-                                        <div 
-                                          className={`transition-all duration-300 rounded-2xl border p-4 sm:p-5 relative ${
-                                            isFact
-                                              ? 'bg-gradient-to-r from-emerald-950/25 via-[#131E17] to-[#101913] border-emerald-500/40 border-l-4 border-l-emerald-400 shadow-lg shadow-emerald-950/20'
-                                              : isConfirmedByUser
-                                                ? 'bg-gradient-to-r from-emerald-950/30 via-[#182319] to-[#111A12] border-emerald-400 border-l-4 border-l-emerald-400 shadow-xl shadow-emerald-950/30'
-                                                : 'bg-gradient-to-r from-amber-950/20 via-[#1B1812] to-[#14120D] border-[#C9A84C]/35 border-dashed border-l-4 border-l-[#C9A84C] hover:border-solid hover:border-[#C9A84C]/60'
-                                          }`}
-                                        >
-                                          {/* Top header row */}
-                                          <div className="flex flex-wrap items-center justify-between gap-2.5 mb-2.5">
-                                            <div className="flex items-center gap-2.5">
-                                              <span className={`w-7 h-7 rounded-xl flex items-center justify-center text-xs font-mono font-bold ${
-                                                isFact || isConfirmedByUser
-                                                  ? 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-300'
-                                                  : 'bg-[#C9A84C]/20 border border-[#C9A84C]/40 text-[#C9A84C]'
-                                              }`}>
-                                                {step.num}
-                                              </span>
-                                              <div>
-                                                <h4 className="text-white text-xs sm:text-sm font-bold font-display tracking-wide uppercase flex items-center gap-2">
-                                                  <IconComponent className="w-3.5 h-3.5 text-[#C9A84C]" />
-                                                  {step.title}
-                                                </h4>
-                                                <span className="text-[10px] text-white/50 block font-mono">
-                                                  {step.sub}
-                                                </span>
-                                              </div>
-                                            </div>
-
-                                            {/* Status Badge */}
-                                            <div className="flex items-center gap-2">
-                                              {isFact ? (
-                                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 uppercase tracking-wider">
-                                                  <CheckCircle className="w-3 h-3 text-emerald-400" />
-                                                  LO QUE SABEMOS
-                                                </span>
-                                              ) : isConfirmedByUser ? (
-                                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-mono font-bold bg-emerald-500/25 text-emerald-200 border border-emerald-400 uppercase tracking-wider shadow-sm shadow-emerald-500/20">
-                                                  <Check className="w-3 h-3 text-emerald-300" />
-                                                  ✓ CONFIRMADO POR TI
-                                                </span>
-                                              ) : (
-                                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-mono font-bold bg-[#C9A84C]/15 text-[#C9A84C] border border-[#C9A84C]/35 uppercase tracking-wider">
-                                                  <Search className="w-3 h-3 text-[#C9A84C]" />
-                                                  PROPUESTO PARA EXPLORAR
-                                                </span>
-                                              )}
-                                            </div>
-                                          </div>
-
-                                          {/* Step description */}
-                                          <div className="bg-black/40 border border-white/5 p-3.5 sm:p-4 rounded-xl space-y-2 my-2">
-                                            <p className="text-sm sm:text-base font-sans text-white/95 leading-relaxed font-medium">
-                                              {stepContent}
-                                            </p>
-                                            <div className="flex items-center gap-2 text-[11px] text-white/50 italic border-t border-white/5 pt-2">
-                                              <Info className="w-3 h-3 text-white/40 flex-shrink-0" />
-                                              <span>{stepJustif}</span>
-                                            </div>
-                                          </div>
-
-                                          {/* Action toggle for hypothesis steps */}
-                                          {isExploration && (
-                                            <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-                                              <span className="text-[11px] text-white/60">
-                                                {isConfirmedByUser 
-                                                  ? "✓ Has validado esta hipótesis como representativa de tu experiencia interna."
-                                                  : "¿Esta descripción refleja lo que experimentas en tu corazón?"}
-                                              </span>
-                                              <button
-                                                type="button"
-                                                onClick={() => toggleHeartStep(step.key)}
-                                                className={`px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer transition-all flex items-center gap-1.5 ${
-                                                  isConfirmedByUser
-                                                    ? 'bg-emerald-600/30 hover:bg-emerald-600/40 text-emerald-200 border border-emerald-500/40'
-                                                    : 'bg-[#C9A84C]/20 hover:bg-[#C9A84C]/35 text-[#C9A84C] border border-[#C9A84C]/40 hover:border-[#C9A84C]'
-                                                }`}
-                                              >
-                                                {isConfirmedByUser ? (
-                                                  <>
-                                                    <Check className="w-3.5 h-3.5" />
-                                                    Validado (clic para desmarcar)
-                                                  </>
-                                                ) : (
-                                                  <>
-                                                    <Sparkles className="w-3.5 h-3.5" />
-                                                    Sí, me identifico (validar hipótesis)
-                                                  </>
-                                                )}
-                                              </button>
-                                            </div>
-                                          )}
-                                        </div>
-
-                                        {/* Connector down arrow */}
-                                        {idx < heartStepsConfig.length - 1 && (
-                                          <div className="flex flex-col items-center justify-center my-1 py-0.5" aria-hidden="true">
-                                            <div className="w-0.5 h-3 bg-gradient-to-b from-[#C9A84C]/30 to-[#C9A84C]/70" />
-                                            <div className="w-6 h-6 rounded-full bg-[#181818] border border-[#C9A84C]/40 flex items-center justify-center text-[#C9A84C] shadow-sm my-0.5">
-                                              <ArrowDown className="w-3 h-3 text-[#C9A84C]" />
-                                            </div>
-                                            <div className="w-0.5 h-3 bg-gradient-to-b from-[#C9A84C]/70 to-[#C9A84C]/30" />
-                                          </div>
-                                        )}
-                                      </React.Fragment>
-                                    );
-                                  })}
-                                </div>
-
-                                {/* Biblical foundation footer */}
-                                <div className="bg-black/50 border border-white/10 p-4 rounded-2xl flex items-start gap-3 text-xs text-white/70 leading-relaxed">
-                                  <Heart className="w-4 h-4 text-[#C9A84C] flex-shrink-0 mt-0.5" />
-                                  <div>
-                                    <strong className="text-[#C9A84C] font-semibold block mb-0.5">Fundamento Bíblico:</strong>
-                                    «Sobre toda cosa guardada, guarda tu corazón; porque de él mana la vida» (Proverbios 4:23). El cambio bíblico no consiste en controlar externamente la respuesta o castigar el síntoma, sino en llevar el deseo y el temor a la cruz de Cristo, donde su gracia transforma la raíz.
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })()}
-                        </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="bg-red-500/[0.03] border border-red-500/15 p-5 rounded-2xl space-y-2">
+                      <span className="text-[10px] text-red-400 uppercase tracking-widest font-mono font-bold block">La mentira que se rompe</span>
+                      <p className="text-red-100 text-sm italic font-serif leading-relaxed">
+                        “{results[0]?.afirmacionTest}”
+                      </p>
+                    </div>
+                    <div className="bg-emerald-500/[0.03] border border-emerald-500/15 p-5 rounded-2xl space-y-2">
+                      <span className="text-[10px] text-emerald-400 uppercase tracking-widest font-mono font-bold block">La verdad que te redime</span>
+                      <p className="text-emerald-50 text-sm leading-relaxed">
+                        {results[0]?.verdad}
+                      </p>
+                      {results[0]?.versiculos?.[0] && (
+                        <p className="text-emerald-200/70 text-xs italic leading-relaxed">
+                          “{results[0].versiculos[0].txt}” — {results[0].versiculos[0].ref}
+                        </p>
                       )}
+                    </div>
+                  </div>
 
-                      {/* SECCIÓN: MAPEO DINÁMICO DE INTERACCIONES ENTRE BLOQUES */}
-                      <div className="border bg-gradient-to-br from-[#1A1813] via-[#141414] to-[#0E0E0E] border-[#C9A84C]/30 p-6 sm:p-8 rounded-3xl relative overflow-hidden text-white/90 shadow-2xl space-y-6">
-                        <div className="absolute top-0 right-0 w-64 h-64 bg-[radial-gradient(ellipse_at_top_right,rgba(201,168,76,0.12),transparent)] pointer-events-none" />
+                  <div className="bg-[#0F1411] border border-emerald-500/20 p-5 rounded-2xl space-y-2">
+                    <span className="text-[10px] text-emerald-400 font-mono tracking-wider uppercase font-bold block">
+                      Tu declaración — repítela cada mañana
+                    </span>
+                    <p className="text-emerald-100 text-sm font-serif italic leading-relaxed">
+                      “{results[0]?.declaracion}”
+                    </p>
+                  </div>
+                </div>
+                {/* TU PLAN DE 30 DÍAS */}
+                <div className="space-y-5 pt-4 border-t border-[#C9A84C]/25">
+                  <div className="flex items-center gap-2 text-[#C9A84C]">
+                    <Heart className="w-5 h-5 text-[#C9A84C]" />
+                    <h3 className="text-lg font-bold font-display text-white">
+                      Tu plan para romper «{results[0]?.alias || 'esta creencia'}» y vivir redimido
+                    </h3>
+                  </div>
+                  <div className="bg-[#0F1411] border border-[#C9A84C]/25 p-5 rounded-2xl space-y-2">
+                    <span className="text-[10px] text-[#C9A84C] font-mono tracking-wider uppercase font-bold block">
+                      Cita base de tu plan · {CITA_BASE}
+                    </span>
+                    <p className="text-emerald-100 text-sm font-serif italic leading-relaxed">
+                      “{TEXTO_CITA_BASE}”
+                    </p>
+                  </div>
+                  <p className="text-xs text-white/60 leading-relaxed">
+                    No es igual para todos: nace de la creencia que tu autoexamen detectó. Cuatro elementos, un día a la vez.
+                  </p>
 
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-2 text-[#C9A84C]">
-                              <Zap className="w-5 h-5 text-[#C9A84C]" />
-                              <span className="text-xs font-mono uppercase font-bold tracking-wider">
-                                Mapeo de Interacciones entre Dimensiones
-                              </span>
-                            </div>
-                            <h3 className="text-xl sm:text-2xl font-bold font-display text-white">
-                              Cómo se Influyen Mutuamente tus Bloques Activos
-                            </h3>
-                          </div>
-
-                          <button
-                            type="button"
-                            onClick={() => setSelectedBlockModalId(primaryBlock.id || 'control-entorno')}
-                            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-mono text-[#C9A84C] hover:text-white transition-all cursor-pointer self-start sm:self-auto font-medium"
-                          >
-                            <BookOpen className="w-4 h-4 text-[#C9A84C]" />
-                            Glosario & Fundamento de los 9 Bloques
-                          </button>
-                        </div>
-
-                        {/* Metodología explicada */}
-                        <div className="bg-black/40 border border-white/5 p-4 rounded-2xl space-y-2 text-xs sm:text-sm text-white/80 leading-relaxed">
-                          <p>
-                            <strong className="text-white">Principio Metodológico: </strong>
-                            Un bloque con puntaje alto <strong>NO significa automáticamente un problema</strong>. Por ejemplo: una necesidad de <em>Control</em> alta no equivale a ser una «persona controladora»; puede ser una respuesta de prudencia, responsabilidad o una maniobra para amortiguar dudas de <em>Capacidad</em> o proteger la <em>Aceptación Social</em>.
-                          </p>
-                          <p className="text-white/60 text-xs italic">
-                            Por eso buscamos interacciones entre dimensiones: contrastamos cómo dos áreas se potencian para formular hipótesis de trabajo y preguntas que tú mismo puedas discernir.
-                          </p>
-                        </div>
-
-                        {/* Lista de interacciones detectadas */}
-                        {detectedInteractions.length > 0 ? (
-                          <div className="space-y-4">
-                            {[...detectedInteractions]
-                              .sort((a, b) => {
-                                const aRej = rejectedInteractions[a.id] ? 1 : 0;
-                                const bRej = rejectedInteractions[b.id] ? 1 : 0;
-                                if (aRej !== bRej) return aRej - bRej;
-                                return (a.nivel === 'patron' ? 0 : 1) - (b.nivel === 'patron' ? 0 : 1);
-                              })
-                              .map((inter, idx) => {
-                                const isValidated = validatedInteractions[inter.id];
-                                const isRejected = rejectedInteractions[inter.id];
-                                const isSignal = inter.nivel === 'senal';
-                                const confEvaluation = interactionConfidence[inter.id];
-                                const confLevel = confEvaluation?.nivel || 'MODERADA';
-                                const confBadge = getConfidenceBadgeProps(confLevel);
-                                return (
-                                  <div
-                                    key={inter.id || idx}
-                                    className={`p-5 rounded-2xl border transition-all space-y-4 ${
-                                      isRejected ? 'opacity-50' : isSignal ? 'opacity-70' : ''
-                                    } ${
-                                      isValidated
-                                        ? 'bg-emerald-950/25 border-emerald-500/40 shadow-lg shadow-emerald-500/5'
-                                        : isRejected
-                                        ? 'bg-black/20 border-white/5'
-                                        : 'bg-black/35 border-white/10 hover:border-[#C9A84C]/40'
-                                    }`}
-                                  >
-                                    {/* Interaction Badge Header */}
-                                    <div className="flex flex-wrap items-center justify-between gap-3">
-                                      <div className="flex flex-wrap items-center gap-2">
-                                        <span className="px-3 py-1 rounded-lg bg-[#C9A84C]/15 border border-[#C9A84C]/30 text-xs font-mono font-bold text-[#C9A84C]">
-                                          {inter.blockA.name} ({inter.blockA.score}/5)
-                                        </span>
-                                        <span className="text-white/40 text-xs font-mono font-bold">⚡</span>
-                                        <span className="px-3 py-1 rounded-lg bg-amber-500/15 border border-amber-500/30 text-xs font-mono font-bold text-amber-300">
-                                          {inter.blockB.name} ({inter.blockB.score}/5)
-                                        </span>
-                                        {isSignal && (
-                                          <span className="px-2.5 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-[10px] font-mono font-bold text-amber-300 uppercase tracking-wider">
-                                            Señal débil — a explorar
-                                          </span>
-                                        )}
-                                        {isRejected && (
-                                          <span className="px-2.5 py-0.5 rounded-full bg-rose-500/15 border border-rose-500/30 text-[10px] font-mono font-bold text-rose-300 uppercase tracking-wider">
-                                            No te identificaste
-                                          </span>
-                                        )}
-                                        <span className={`px-2.5 py-0.5 rounded-full border text-[10px] font-mono font-bold uppercase tracking-wider inline-flex items-center gap-1.5 ${confBadge.badgeBg}`}>
-                                          <span className={`w-1.5 h-1.5 rounded-full ${confBadge.dotColor}`} />
-                                          {confBadge.label}
-                                        </span>
-                                      </div>
-
-                                      <span className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[10px] font-mono uppercase tracking-wider text-white/70 font-semibold">
-                                        Eje: {inter.tag}
-                                      </span>
-                                    </div>
-
-                                  {/* Hipótesis de Interacción */}
-                                  <div className="space-y-1 bg-black/40 border border-white/5 p-3.5 rounded-xl">
-                                    <span className="text-[10px] font-mono uppercase tracking-wider text-[#C9A84C] font-bold block">
-                                      Hipótesis de Trabajo (A Explorar Juntos)
-                                    </span>
-                                    <p className="text-xs sm:text-sm text-white/95 leading-relaxed font-medium">
-                                      {inter.hipotesis}
-                                    </p>
-                                  </div>
-
-                                  {/* Pregunta Clave */}
-                                  <div className="space-y-1 bg-black/40 border border-white/5 p-3.5 rounded-xl">
-                                    <span className="text-[10px] font-mono uppercase tracking-wider text-amber-300 font-bold block">
-                                      Pregunta Clave de Discernimiento Pastoral
-                                    </span>
-                                    <p className="text-xs sm:text-sm text-amber-100/90 italic leading-relaxed">
-                                      "{inter.preguntaClave}"
-                                    </p>
-                                  </div>
-
-                                  {/* Dirección de Gracia */}
-                                  <div className="text-xs text-white/75 bg-white/5 border border-white/5 p-3 rounded-xl flex items-start gap-2">
-                                    <Heart className="w-3.5 h-3.5 text-[#C9A84C] flex-shrink-0 mt-0.5" />
-                                    <span>
-                                      <strong className="text-white">Dirección de Gracia: </strong>
-                                      {inter.direccionPastoral}
-                                    </span>
-                                  </div>
-
-                                  {/* Botón interactivo de validación */}
-                                  <div className="pt-1 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-white/5">
-                                    <button
-                                      type="button"
-                                      onClick={() => toggleValidatedInteraction(inter.id)}
-                                      className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-                                        isValidated
-                                          ? 'bg-emerald-500 text-black shadow-md shadow-emerald-500/20'
-                                          : 'bg-white/10 hover:bg-white/20 text-white border border-white/10'
-                                      }`}
-                                    >
-                                      {isValidated ? (
-                                        <>
-                                          <Check className="w-3.5 h-3.5" />
-                                          ✓ Hipótesis de Interacción Validada por ti
-                                        </>
-                                      ) : (
-                                        <>
-                                          <Sparkles className="w-3.5 h-3.5 text-[#C9A84C]" />
-                                          ¿Esta combinación describe tu experiencia? Clic para validar
-                                        </>
-                                      )}
-                                    </button>
-
-                                    <button
-                                      type="button"
-                                      onClick={() => setSelectedBlockModalId(inter.blockA.id)}
-                                      className="text-[11px] font-mono text-white/50 hover:text-[#C9A84C] transition-colors cursor-pointer flex items-center gap-1 self-start sm:self-auto"
-                                    >
-                                      Ver qué mide {inter.blockA.name} <ChevronRight className="w-3 h-3" />
-                                    </button>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        ) : (
-                          <div className="bg-black/30 border border-white/5 p-5 rounded-2xl text-center space-y-3">
-                            <Shield className="w-8 h-8 text-emerald-400 mx-auto" />
-                            <p className="text-xs text-white/80 max-w-md mx-auto leading-relaxed">
-                              Tus respuestas actuales no muestran cruces simultáneos de alta fricción entre bloques. Las áreas examinadas se presentan en rangos moderados o independientes.
-                            </p>
-                            <button
-                              type="button"
-                              onClick={() => setSelectedBlockModalId(primaryBlock.id || 'control-entorno')}
-                              className="px-4 py-2 rounded-xl bg-[#C9A84C]/20 border border-[#C9A84C]/40 text-[#C9A84C] text-xs font-mono font-bold hover:bg-[#C9A84C]/30 transition-all cursor-pointer inline-flex items-center gap-2"
-                            >
-                              <BookOpen className="w-3.5 h-3.5" /> Explorar Definición de los 9 Bloques
-                            </button>
-                          </div>
-                        )}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {PLAN_PROVERBIOS.map((el) => (
+                      <div key={el.id} className="bg-[#161616] border border-white/5 p-4 rounded-2xl space-y-1">
+                        <span className="text-[10px] font-mono font-bold text-[#C9A84C] uppercase block">{el.numero}. {el.titulo} · Días {el.diasInicio}–{el.diasFin}</span>
+                        <p className="text-white/85 text-xs leading-relaxed">Tiene que ver con {el.tieneQueVer.toLowerCase()}: {el.hacer.toLowerCase()}.</p>
                       </div>
-
-                      {/* SECCIÓN 6: PERSPECTIVA NEURO-ESPIRITUAL */}
-                      <div className="border bg-[#161616]/70 border-white/5 p-6 sm:p-8 rounded-3xl relative overflow-hidden text-white/90">
-                        <div className="flex items-center gap-2 text-[#C9A84C] mb-3">
-                          <Brain className="w-5 h-5 text-[#C9A84C]" />
-                          <span className="text-xs font-mono uppercase font-bold tracking-wider">Perspectiva Neuro-Espiritual</span>
-                        </div>
-                        <p className="text-base font-sans leading-relaxed italic text-white/90">
-                          "{introParagraph}"
-                        </p>
-                        <p className="mt-4 text-xs text-white/50 block">
-                          — Tu cuerpo aprendió estos patrones para protegerte frente a vivencias difíciles, pero la verdad del evangelio renueva el entendimiento y produce descanso genuino en el corazón (Romanos 12:2).
-                        </p>
-                      </div>
-
-                      {/* SECCIÓN 7: CLASIFICACIÓN DE PERFIL & ÁREAS DE RESONANCIA */}
-                      <div className="space-y-8 pt-2">
-                        {/* Lista de áreas ordenadas por resonancia (ancho completo) */}
-                        <div className="bg-[#141414] p-5 sm:p-7 rounded-3xl border border-white/5 space-y-4">
-                          <div className="flex justify-between items-center text-xs font-mono text-white/50 px-1 border-b border-white/5 pb-3">
-                            <span className="text-xs sm:text-sm text-[#C9A84C] font-mono uppercase font-bold tracking-wide">
-                              Áreas ordenadas por resonancia
-                            </span>
-                            <span>Puntaje</span>
-                          </div>
-                          <div className="space-y-2.5">
-                            {sortedBlocksWithScores.map((b) => {
-                              const isSevere = b.score >= 3;
-                              const percent = (b.score / 5) * 100;
-                              return (
-                                <div key={b.id} className="bg-[#101010] border border-white/5 rounded-xl p-3 space-y-1.5">
-                                  <div className="flex justify-between items-center text-xs sm:text-sm">
-                                    <div className="flex items-center gap-2">
-                                      <span className="font-medium text-white/90">{b.title}</span>
-                                      <button
-                                        type="button"
-                                        onClick={() => setSelectedBlockModalId(b.id)}
-                                        className="text-[10px] text-[#C9A84C]/80 hover:text-[#C9A84C] hover:underline font-mono cursor-pointer flex items-center gap-0.5"
-                                        title="Ver qué mide y qué no mide este bloque"
-                                      >
-                                        <HelpCircle className="w-3 h-3" />
-                                        <span>Definición</span>
-                                      </button>
-                                    </div>
-                                    <span className={`font-mono text-xs font-bold px-2 py-0.5 rounded-md ${
-                                      isSevere ? 'bg-red-500/15 text-red-400 border border-red-500/25' : 'bg-[#C9A84C]/10 text-[#C9A84C] border border-[#C9A84C]/25'
-                                    }`}>
-                                      {b.score} / 5
-                                    </span>
-                                  </div>
-                                  <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden">
-                                    <div 
-                                      className={`h-full rounded-full transition-all duration-500 ${
-                                        isSevere ? 'bg-gradient-to-r from-red-500 to-rose-400' : 'bg-gradient-to-r from-[#C9A84C] to-amber-400'
-                                      }`}
-                                      style={{ width: `${percent}%` }}
-                                    />
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-
-                        {/* Diagnostic details (Línea de Exploración de Perfil) */}
-                        <div className="space-y-4">
-                          <div className="flex items-center gap-2 text-[#C9A84C]">
-                            <Sparkles className="w-5 h-5" />
-                            <h4 className="text-lg font-bold font-display">Línea de Exploración de Perfil</h4>
-                          </div>
-
-                          <div className="bg-[#141414] border border-white/5 rounded-2xl p-5 space-y-4">
-                            <div>
-                              <span className="text-[10px] text-[#C9A84C] uppercase tracking-wider font-mono font-bold">
-                                Hipótesis de Creencia a Contrastar
-                              </span>
-                              {tiedHypotheses.length > 1 ? (
-                                <div className="space-y-3 mt-2">
-                                  <p className="text-xs text-[#C9A84C] font-mono">
-                                    Estas áreas resonaron con la misma intensidad; conviene explorar ambas.
-                                  </p>
-                                  <div className="space-y-2">
-                                    {tiedHypotheses.map((h, idx) => {
-                                      const blockName = bloquesDiagnostico[h.bloqueId]?.title || h.bloque;
-                                      return (
-                                        <div key={idx} className="bg-black/30 border border-white/5 p-3 rounded-xl">
-                                          <p className="text-white text-sm font-semibold leading-relaxed">
-                                            «{h.afirmacionTest || h.creencia}»
-                                          </p>
-                                          <span className="text-[10px] text-white/40 font-mono block mt-1">
-                                            Bloque: {blockName}
-                                          </span>
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-                              ) : (
-                                <>
-                                  <p className="text-white text-base font-semibold leading-relaxed mt-1">
-                                    {displayBelief}
-                                  </p>
-                                  <span className="text-[10px] text-white/40 font-mono block mt-1">
-                                    Bloque asociado: {primaryBlock.title} ({primaryBlock.score}/5)
-                                  </span>
-                                </>
-                              )}
-                            </div>
-
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-white/5 pt-3">
-                              <div>
-                                <span className="text-[10px] text-[#C9A84C] uppercase tracking-wider font-mono font-bold">Hipótesis de Temor Raíz</span>
-                                <p className="text-white/80 text-xs leading-relaxed mt-1">
-                                  {aiDiagnosis?.fase1?.rootFear || results[0]?.impacto || "Temor a que la situación se desborde si no intervienes personalmente."}
-                                </p>
-                              </div>
-                              <div>
-                                <span className="text-[10px] text-[#C9A84C] uppercase tracking-wider font-mono font-bold">Emoción Observada</span>
-                                <p className="text-white/80 text-xs leading-relaxed mt-1">
-                                  {aiDiagnosis?.fase1?.dominantEmotion || (primaryBlock.score >= 3 ? "Alerta y tensión continua" : "Inseguridad periódica")}
-                                </p>
-                              </div>
-                            </div>
-
-                            <div className="border-t border-white/5 pt-3">
-                              <span className="text-[10px] text-[#C9A84C] uppercase tracking-wider font-mono font-bold block mb-1">
-                                Tendencia Conductual a Vigilar
-                              </span>
-                              <p className="text-white/70 text-xs leading-relaxed italic">
-                                "{aiDiagnosis?.fase2?.selfSabotageMechanism || (results[0]?.conducta ? results[0].conducta.join(", ") : 'Asumir el control excesivo o postergar decisiones para protegerte del error.')}"
-                              </p>
-                            </div>
-                          </div>
-
-                          {/* Mensaje de cuidado pastoral si hay muchos bloques severos */}
-                          {severeBlocksCount >= 4 && (
-                            <div className="bg-amber-950/20 border border-amber-500/30 p-4 rounded-2xl flex items-start gap-3 text-amber-200 text-xs leading-relaxed">
-                              <Heart className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
-                              <div>
-                                <strong className="text-amber-300 font-bold block mb-1">Acompañamiento recomendado:</strong>
-                                Has registrado varios bloques con activación elevada simultánea. Esto refleja un período de sobrecarga importante. Te animamos a no llevar este proceso a solas y buscar un espacio de consejería pastoral o profesional para caminar con respaldo y serenidad.
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* SECCIÓN 8: COSTO DE MANTENER LA MENTIRA (4 DIMENSIONES PERSONALIZADAS) */}
-                      <div className="space-y-4 pt-4">
-                        <div className="text-center space-y-1">
-                          <h4 className="text-[#C9A84C] font-bold text-sm uppercase tracking-wider font-mono">
-                            Costo Actual de Mantener la Mentira (Las 4 Dimensiones)
-                          </h4>
-                          <p className="text-xs text-white/50">
-                            Impacto específico en tu vida diaria basado en tu área dominante ({primaryBlock.title})
-                          </p>
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-                          <div className="bg-red-500/[0.03] border border-red-500/15 p-5 rounded-2xl space-y-2">
-                            <span className="text-xs font-mono font-bold text-red-400 block uppercase">1. Decisiones</span>
-                            <p className="text-white/80 text-xs leading-relaxed">
-                              {aiDiagnosis?.fase2?.currentCost?.decisions || primaryGuide.dimensionCosts.decisions}
-                            </p>
-                          </div>
-                          <div className="bg-red-500/[0.03] border border-red-500/15 p-5 rounded-2xl space-y-2">
-                            <span className="text-xs font-mono font-bold text-red-400 block uppercase">2. Emociones</span>
-                            <p className="text-white/80 text-xs leading-relaxed">
-                              {aiDiagnosis?.fase2?.currentCost?.emotions || primaryGuide.dimensionCosts.emotions}
-                            </p>
-                          </div>
-                          <div className="bg-red-500/[0.03] border border-red-500/15 p-5 rounded-2xl space-y-2">
-                            <span className="text-xs font-mono font-bold text-red-400 block uppercase">3. Relaciones</span>
-                            <p className="text-white/80 text-xs leading-relaxed">
-                              {aiDiagnosis?.fase2?.currentCost?.relationships || primaryGuide.dimensionCosts.relationships}
-                            </p>
-                          </div>
-                          <div className="bg-red-500/[0.03] border border-red-500/15 p-5 rounded-2xl space-y-2">
-                            <span className="text-xs font-mono font-bold text-red-400 block uppercase">4. Futuro / Propósito</span>
-                            <p className="text-white/80 text-xs leading-relaxed">
-                              {aiDiagnosis?.fase2?.currentCost?.potentialFuture || primaryGuide.dimensionCosts.potentialFuture}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* SECCIÓN 9: FORTALEZAS (TUS ÁREAS MÁS SANAS) */}
-                      <div className="space-y-4 pt-4 border-t border-white/5">
-                        <div className="flex items-center gap-2 text-emerald-400">
-                          <Shield className="w-5 h-5 text-emerald-400" />
-                          <h4 className="text-lg font-bold font-display text-white">Tus Áreas Más Sanas</h4>
-                        </div>
-                        <p className="text-xs text-white/60 leading-relaxed">
-                          Tu autoexploración también muestra áreas de libertad, equilibrio y paz. Reconocer estas fortalezas te da un punto de apoyo firme para renovar lo demás:
-                        </p>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                          {healthiestBlocks.map((block) => (
-                            <div key={block.id} className="bg-emerald-950/20 border border-emerald-500/20 p-4 rounded-2xl flex items-center justify-between">
-                              <div className="flex items-center gap-3">
-                                <div className="w-7 h-7 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 text-xs font-bold">
-                                  ✓
-                                </div>
-                                <div>
-                                  <h5 className="text-white text-xs font-bold">{block.title}</h5>
-                                  <span className="text-[10px] text-emerald-400/80 font-mono">Puntaje saludable: {block.score}/5</span>
-                                </div>
-                              </div>
-                              <span className="text-[9px] uppercase font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-300 font-semibold border border-emerald-500/20">
-                                En paz
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* SECCIÓN 10: PASOS PRÁCTICOS Y LLAMADO A LA ACCIÓN */}
-                      <div className="space-y-5 pt-4 border-t border-white/5">
-                        <div className="flex items-center gap-2 text-[#C9A84C]">
-                          <Calendar className="w-5 h-5 text-[#C9A84C]" />
-                          <h4 className="text-lg font-bold font-display text-white">Tu Siguiente Paso Esta Semana</h4>
-                        </div>
-                        <p className="text-xs text-white/60 leading-relaxed">
-                          La renovación de la mente cobra vida cuando la verdad se traduce en acciones concretas. Pon en práctica estos dos pasos basados en tu área dominante ({primaryGuide.blockTitle}):
-                        </p>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div className="bg-[#161616] border border-white/5 p-5 rounded-2xl space-y-2">
-                            <div className="flex items-center gap-2 text-xs font-mono font-bold text-[#C9A84C] uppercase">
-                              <span className="w-5 h-5 rounded-full bg-[#C9A84C]/10 border border-[#C9A84C]/30 flex items-center justify-center text-[#C9A84C] text-[11px]">1</span>
-                              Acción Práctica 1
-                            </div>
-                            <p className="text-white/85 text-xs leading-relaxed">
-                              {primaryGuide.action1}
-                            </p>
-                          </div>
-                          <div className="bg-[#161616] border border-white/5 p-5 rounded-2xl space-y-2">
-                            <div className="flex items-center gap-2 text-xs font-mono font-bold text-[#C9A84C] uppercase">
-                              <span className="w-5 h-5 rounded-full bg-[#C9A84C]/10 border border-[#C9A84C]/30 flex items-center justify-center text-[#C9A84C] text-[11px]">2</span>
-                              Acción Práctica 2
-                            </div>
-                            <p className="text-white/85 text-xs leading-relaxed">
-                              {primaryGuide.action2}
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Versículo para meditar */}
-                        <div className="bg-[#0F1411] border border-emerald-500/20 p-5 rounded-2xl space-y-2">
-                          <span className="text-[10px] text-emerald-400 font-mono tracking-wider uppercase font-bold block">
-                            Versículo para meditar esta semana
-                          </span>
-                          <p className="text-emerald-100 text-sm font-serif italic leading-relaxed">
-                            "{primaryGuide.verse.text}"
-                          </p>
-                          <span className="text-emerald-400 text-xs font-mono font-bold block text-right">
-                            — {primaryGuide.verse.ref}
-                          </span>
-                        </div>
-
-                        {/* Botones de acción principales */}
-                        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
-                          <a
-                            href={`https://wa.me/${cleanWhatsapp}?text=${encodeURIComponent(whatsappMsg)}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="bg-[#25D366] hover:bg-[#20ba56] text-[#0A0A0A] font-bold px-6 py-3.5 rounded-xl text-sm flex items-center justify-center gap-2 shadow-xl hover:scale-[1.02] transition-all w-full sm:w-auto cursor-pointer"
-                          >
-                            <MessageSquare className="w-4 h-4 text-[#0A0A0A]" />
-                            Agenda una sesión de acompañamiento
-                          </a>
-
-                          <button
-                            onClick={handleExportPDF}
-                            className="bg-gradient-to-r from-[#C9A84C] to-yellow-600 hover:from-yellow-400 hover:to-amber-500 text-[#0A0A0A] font-bold px-6 py-3.5 rounded-xl text-sm flex items-center justify-center gap-2 shadow-xl hover:scale-[1.02] transition-all w-full sm:w-auto cursor-pointer"
-                          >
-                            <Download className="w-4 h-4 text-[#0A0A0A]" />
-                            Descargar mi resultado (PDF)
-                          </button>
-                        </div>
-
-                        {/* Configuración rápida de WhatsApp para el ministerio */}
-                        <div className="text-center pt-2">
-                          <button
-                            onClick={() => {
-                              setTempWhatsapp(whatsappNumber);
-                              setShowWhatsappModal(true);
-                            }}
-                            className="text-[11px] text-white/40 hover:text-white/70 underline cursor-pointer"
-                          >
-                            Configurar número de WhatsApp para citas
-                          </button>
-                        </div>
-                      </div>
-                    </motion.div>
-                  );
-                })()}
-
-                {/* TAB 1: 📖 Fase 3 y 4: Renovación Bíblica y Nueva Identidad Cristocéntrica */}
-                {activeTab === 1 && (
+                    ))}
+                  </div>
+                </div>
+                {(
                   <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     className="space-y-8"
                   >
-                    {/* FASE 3: Contraste direct de Mentira vs Verdad */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
-                      <div className="bg-red-500/[0.02] border border-red-500/15 p-6 rounded-3xl space-y-3 relative overflow-hidden">
-                        <div className="absolute top-0 right-0 px-2 py-1 bg-red-500/10 text-red-400 border-bl border-red-500/20 text-[9px] font-mono rounded-bl-lg font-bold">LA ESCLAVITUD CARNAL</div>
-                        <span className="text-[10px] text-red-400 uppercase tracking-widest font-mono font-bold block">La Mentira Sembrada</span>
-                        <p className="text-red-200 text-lg italic font-serif leading-relaxed font-semibold">
-                          "{aiDiagnosis?.fase3?.mentira || results[0]?.afirmacionTest}"
-                        </p>
-                        <p className="text-white/40 text-xs leading-relaxed">
-                          Éste es el postulado inconsciente que debilita tu prefrontal y te aleja de la seguridad en Dios.
-                        </p>
-                      </div>
-
-                      <div className="bg-emerald-500/[0.02] border border-emerald-500/15 p-6 rounded-3xl space-y-3 relative overflow-hidden">
-                        <div className="absolute top-0 right-0 px-2 py-1 bg-emerald-500/10 text-emerald-400 border-bl border-emerald-500/20 text-[9px] font-mono rounded-bl-lg font-bold">LA LIBERTAD DEL ENTENDIMIENTO</div>
-                        <span className="text-[10px] text-emerald-400 uppercase tracking-widest font-mono font-bold block">La Verdad Sellada</span>
-                        <p className="text-emerald-50 text-lg font-medium leading-relaxed">
-                          {aiDiagnosis?.fase3?.verdadBiblica || results[0]?.verdad}
-                        </p>
-                        <p className="text-white/40 text-xs leading-relaxed">
-                          El postulado incondicional del evangelio que disuelve el temor mediante gracia y poder.
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="bg-[#0F1411] border border-emerald-500/10 p-6 rounded-2xl max-w-3xl mx-auto space-y-3">
-                      <span className="text-[10px] text-emerald-400 font-mono tracking-widest block uppercase font-bold">Pasaje Anclero del Entendimiento</span>
-                      <p className="text-emerald-150 leading-relaxed font-serif text-sm italic">
-                        "{aiDiagnosis?.fase3?.versiculo?.texto || results[0]?.versiculos[0]?.txt}"
-                      </p>
-                      <strong className="text-emerald-400 font-mono block text-right">— {aiDiagnosis?.fase3?.versiculo?.referencia || results[0]?.versiculos[0]?.ref}</strong>
-                      <div className="pt-2 border-t border-emerald-500/5 text-xs text-white/50 leading-relaxed">
-                        <strong className="text-emerald-400">Instrucciones de ruminación:</strong> {aiDiagnosis?.fase3?.aplicacion || "Meditar y respirar en voz audible por la mañana antes de abrir pantallas de consumo."}
-                      </div>
-                    </div>
-
-                    {/* FASE 4: Nueva Identidad */}
-                    <div className="bg-gradient-to-br from-[#1A1813] to-[#0A0906] border-2 border-[#C9A84C]/25 p-6 sm:p-8 rounded-[2rem] text-center space-y-4 relative overflow-hidden max-w-3xl mx-auto">
-                      <div className="absolute inset-0 bg-[#C9A84C]/2 w-1/2 blur-3xl pointer-events-none top-1/4 left-1/4" />
-                      <Flame className="w-8 h-8 mx-auto text-[#C9A84C] animate-pulse" />
-                      <span className="text-[#C9A84C] font-mono text-xs uppercase tracking-[0.2em] font-bold block">Fase 4: Determinación de Identidad Cristocéntrica</span>
-                      <blockquote className="text-[#F3F4F6] italic text-base sm:text-lg leading-relaxed font-serif max-w-xl mx-auto">
-                        "{aiDiagnosis?.fase4?.declaracionIdentidad || results[0]?.declaracion}"
-                      </blockquote>
-                      <div className="pt-2 flex justify-center">
-                        <button
-                          onClick={() => handleCopyToClipboard(aiDiagnosis?.fase4?.declaracionIdentidad || results[0]?.declaracion)}
-                          className="bg-[#C9A84C]/10 hover:bg-[#C9A84C]/20 border border-[#C9A84C]/20 text-[#C9A84C] font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 cursor-pointer hover:scale-[1.02] transition-all"
-                        >
-                          <Sparkles className="w-3.5 h-3.5" /> Copiar mi Determinación
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* OTRAS CREENCIAS - Journaling expandable list */}
-                    <div className="space-y-4 max-w-3xl mx-auto pt-4">
-                      <h4 className="text-base font-bold font-display text-white text-center">Explora las restantes creencias detectadas y escribe en tu diario de oración</h4>
-                      <p className="text-white/50 text-xs text-center max-w-md mx-auto">
-                        La renovación neurológica requiere de concienciar el rumiar de pensamientos. Abre cada una para escribir verdades:
-                      </p>
-                      
-                      <div className="space-y-3">
-                        {results.map((r) => (
-                          <div key={r.id} className="bg-[#141414] border border-white/5 rounded-2xl overflow-hidden">
-                            <button
-                              onClick={() => setExpandedBelief(expandedBelief === r.id ? null : r.id)}
-                              className="w-full text-left p-4 flex justify-between items-center bg-[#151515] hover:bg-[#1D1D1D] transition-colors"
-                            >
-                              <div className="flex items-center gap-3">
-                                <span className="text-[10px] bg-[#C9A84C]/10 text-[#C9A84C] w-6 h-6 rounded-full font-bold font-mono flex items-center justify-center">
-                                  {r.id}
-                                </span>
-                                <div>
-                                  <span className="text-[9px] uppercase font-bold text-[#C9A84C]/80 block font-mono">{r.alias}</span>
-                                  <span className="text-white text-xs font-semibold">{r.creencia}</span>
-                                </div>
-                              </div>
-                              {expandedBelief === r.id ? <ChevronUp className="w-4 h-4 text-[#C9A84C]" /> : <ChevronDown className="w-4 h-4 text-white/30" />}
-                            </button>
-
-                            {expandedBelief === r.id && (
-                              <div className="p-5 border-t border-white/5 space-y-4">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                                  <div>
-                                    <span className="text-red-400 block font-mono font-semibold uppercase text-[9px]">Voz del miedo:</span>
-                                    <p className="italic bg-red-500/5 p-3 rounded-xl text-red-150 border border-red-500/5 mt-1">"{r.afirmacionTest}"</p>
-                                    <span className="text-white/40 block font-semibold mt-2 uppercase text-[9px]">Costo:</span>
-                                    <p className="text-white/70 leading-relaxed mt-1">{r.impacto}</p>
-                                  </div>
-                                  <div>
-                                    <span className="text-emerald-400 block font-mono font-semibold uppercase text-[9px]">Sustitución Divina:</span>
-                                    <p className="font-semibold text-emerald-50 mt-1">{r.verdad}</p>
-                                    <div className="bg-[#0D0F0E] p-3 rounded-xl border border-emerald-500/5 mt-2">
-                                      <p className="italic font-serif text-emerald-300">"{r.versiculos[0]?.txt}"</p>
-                                      <strong className="block text-right text-[10px] text-emerald-400 font-mono mt-1">— {r.versiculos[0]?.ref}</strong>
-                                    </div>
-                                  </div>
-                                </div>
-
-                                <div className="space-y-2 border-t border-white/5 pt-3">
-                                  <label className="text-[10px] uppercase font-bold text-[#C9A84C] font-mono block">Diario personal de esta creencia:</label>
-                                  <textarea
-                                    value={journalNotes[r.id] || ''}
-                                    onChange={(e) => {
-                                      const val = e.target.value;
-                                      setJournalNotes(prev => ({
-                                        ...prev,
-                                        [r.id]: val
-                                      }));
-                                    }}
-                                    placeholder="Registra hoy evidencias conscientes donde esta creencia mintió, y cómo aplicarás tu herencia incondicional..."
-                                    className="w-full bg-[#181818] border border-white/10 rounded-xl p-3 text-sm text-white/90 placeholder:text-white/20 font-mono focus:outline-none focus:border-[#C9A84C] min-h-[90px]"
-                                  />
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </motion.div>
-                )}
-
-                {/* TAB 2: 🗓️ Fase 5 y 6: Itinerario de 30 Días e Instrucciones Semanales */}
-                {activeTab === 2 && (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="space-y-8"
-                  >
-                    {/* FASE 5: Hoja de ruta semanal */}
+                    {/* LOS 4 ELEMENTOS DEL PLAN · PROVERBIOS 3:5-9 */}
                     <div className="space-y-4 pt-2">
                       <div className="flex items-center gap-2 text-[#C9A84C]">
                         <Calendar className="w-5 h-5" />
-                        <h4 className="text-base font-bold font-display uppercase tracking-wider font-mono">Fase 5: Hoja de Ruta de Reconfiguración Semanal</h4>
+                        <h4 className="text-base font-bold font-display uppercase tracking-wider font-mono">Los 4 elementos de tu plan</h4>
                       </div>
-                      <p className="text-white/60 text-xs">
-                        Para guiar la renovación mental de forma ordenada, Dios ha facultado etapas en el aprendizaje neural. Recorre este itinerario con paciencia de gracia:
-                      </p>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* Week 1 */}
-                        <div className="bg-[#141414] border-l-4 border-l-indigo-400 p-5 rounded-r-2xl space-y-3 border-y border-r border-white/5">
-                          <span className="text-[10px] text-indigo-400 font-mono font-bold uppercase block">Semana 1: Consciencia Mental</span>
-                          <h4 className="text-white font-bold text-sm">{aiDiagnosis?.fase5?.semana1?.objetivo || "Detectar la mentira en tu diálogo interior"}</h4>
-                          <p className="text-white/60 text-xs leading-relaxed italic">"{aiDiagnosis?.fase5?.semana1?.reflexion || "Registrarás cada rumiar de insuficiencia que te quite la paz."}"</p>
-                          <div className="text-[11px] text-[#C9A84C] font-mono leading-relaxed bg-[#0D0D0D] p-3 rounded-lg border border-white/5">
-                            <strong>Pregunta Demoledora:</strong> {aiDiagnosis?.fase5?.semana1?.autoconfrontacion || "¿Le creo al acusador mundano o a mi Salvador?"}
-                          </div>
-                          <div className="border-t border-white/5 pt-2 text-[10px] text-white/40 leading-relaxed font-mono">
-                            <strong>Oración de Derribo:</strong> {aiDiagnosis?.fase5?.semana1?.oracionGuiada}
-                          </div>
-                        </div>
-
-                        {/* Week 2 */}
-                        <div className="bg-[#141414] border-l-4 border-l-emerald-400 p-5 rounded-r-2xl space-y-3 border-y border-r border-white/5">
-                          <span className="text-[10px] text-emerald-400 font-mono font-bold uppercase block">Semana 2: Desmantelamiento Cognitivo</span>
-                          <h4 className="text-white font-bold text-sm">{aiDiagnosis?.fase5?.semana2?.objetivo || "Debilitar la creencia mediante evidencias"}</h4>
-                          <p className="text-white/60 text-xs leading-relaxed italic">"{aiDiagnosis?.fase5?.semana2?.reencuadreBiblico || "Buscarás evidencias del cuidado de Dios contradiciendo el pánico de escasez."}"</p>
-                          <div className="text-[11px] text-[#C9A84C] font-mono leading-relaxed bg-[#0D0D0D] p-3 rounded-lg border border-white/5">
-                            <strong>Desafíos Conductuales:</strong> {aiDiagnosis?.fase5?.semana2?.desafiosPracticos || "Toma decisiones sin pedir aprobación redundante."}
-                          </div>
-                          <div className="border-t border-white/5 pt-2 text-[10px] text-white/40 leading-relaxed font-mono">
-                            <strong>Anclaje Neural:</strong> {aiDiagnosis?.fase5?.semana2?.interrupcionPatrones || "Pon tu mano en el pecho al sentir pánico y susurra: 'Su gracia es mi ancla'."}
-                          </div>
-                        </div>
-
-                        {/* Week 3 */}
-                        <div className="bg-[#141414] border-l-4 border-l-amber-500 p-5 rounded-r-2xl space-y-3 border-y border-r border-white/5">
-                          <span className="text-[10px] text-[#C9A84C] font-mono font-bold uppercase block">Semana 3: Renovación y Cableado Nuevo</span>
-                          <h4 className="text-white font-bold text-sm">{aiDiagnosis?.fase5?.semana3?.objetivo || "Instalar nuevas autopistas de fe"}</h4>
-                          <p className="text-white/60 text-xs leading-relaxed italic">"{aiDiagnosis?.fase5?.semana3?.meditacionDiaria || "Integrarás la ruminación rítmica y la gratitud incondicional."}"</p>
-                          <div className="text-[11px] text-[#C9A84C] font-mono leading-relaxed bg-[#0D0D0D] p-3 rounded-lg border border-white/5">
-                            <strong>Memorización de Pasaje:</strong> {aiDiagnosis?.fase5?.semana3?.memorizacionVersiculo || "Visualiza el versículo en post-it de tu baño o celular."}
-                          </div>
-                          <div className="border-t border-white/5 pt-2 text-[10px] text-white/40 leading-relaxed font-mono">
-                            <strong>Visualización Cristocéntrica:</strong> {aiDiagnosis?.fase5?.semana3?.visualizacionBiblica || "Ensaya mentalmente por la noche actuando en paz."}
-                          </div>
-                        </div>
-
-                        {/* Week 4 */}
-                        <div className="bg-[#141414] border-l-4 border-l-rose-400 p-5 rounded-r-2xl space-y-3 border-y border-r border-white/5">
-                          <span className="text-[10px] text-rose-400 font-mono font-bold uppercase block">Semana 4: Consolidación y Obediencia de Fe</span>
-                          <h4 className="text-white font-bold text-sm">{aiDiagnosis?.fase5?.semana4?.objetivo || "Vivir bajo soberana filiación"}</h4>
-                          <p className="text-white/60 text-xs leading-relaxed italic">"{aiDiagnosis?.fase5?.semana4?.retosReales || "Levanta la mano en tareas de incomodidad confiada."}"</p>
-                          <div className="text-[11px] text-[#C9A84C] font-mono leading-relaxed bg-[#0D0D0D] p-3 rounded-lg border border-white/5">
-                            <strong>Porvenir de Hijo:</strong> {aiDiagnosis?.fase5?.semana4?.accionesFe || "Ofrece un acto de extrema generosidad."}
-                          </div>
-                          <div className="border-t border-white/5 pt-2 text-[10px] text-white/40 leading-relaxed font-mono">
-                            <strong>Paso de Obediencia:</strong> {aiDiagnosis?.fase5?.semana4?.pasosObediencia || "Acepta ese puesto ministerial o encargo pastoral que habías pospuesto."}
-                          </div>
-                        </div>
+                        {PLAN_PROVERBIOS.map((el) => {
+                          const semana = [aiDiagnosis?.fase5?.semana1, aiDiagnosis?.fase5?.semana2, aiDiagnosis?.fase5?.semana3, aiDiagnosis?.fase5?.semana4][el.semanaIndex] as any;
+                          return (
+                            <div key={el.id} className="bg-[#141414] border-l-4 border-l-[#C9A84C] p-5 rounded-r-2xl space-y-3 border-y border-r border-white/5">
+                              <span className="text-[10px] text-[#C9A84C] font-mono font-bold uppercase block">{el.numero}. {el.titulo} · Días {el.diasInicio}–{el.diasFin}</span>
+                              <ul className="space-y-1.5 text-xs leading-relaxed">
+                                {elementLines(el).map((l) => (
+                                  <li key={l.label} className="text-white/80">
+                                    <strong className="text-white">{l.label}:</strong> {l.text}
+                                  </li>
+                                ))}
+                              </ul>
+                              {semana?.objetivo && (
+                                <div className="border-t border-white/5 pt-2 text-[11px] text-white/60 leading-relaxed">
+                                  <strong className="text-[#C9A84C]">Enfoque de la semana:</strong> {semana.objetivo}
+                                  {semana.reflexion && <span className="block italic mt-1">“{semana.reflexion}”</span>}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
 
@@ -4030,8 +2675,11 @@ export default function App() {
                     <div className="bg-[#141414] border border-white/5 rounded-3xl p-6 sm:p-8 space-y-6">
                       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                         <div className="space-y-1">
-                          <span className="text-[10px] uppercase font-bold text-[#C9A84C] font-mono block">Fase 6: Itinerario de Reconfiguración Diario</span>
+                          <span className="text-[10px] uppercase font-bold text-[#C9A84C] font-mono block">Día a día</span>
                           <h4 className="text-lg font-bold font-display text-white">Interactiva tu agenda de 30 días</h4>
+                          <p className="text-white/50 text-xs leading-relaxed">
+                            {PLAN_PROVERBIOS.map((el) => `Días ${el.diasInicio}–${el.diasFin}: ${el.titulo}`).join(' · ')}
+                          </p>
                         </div>
                         <span className="bg-[#C9A84C]/5 border border-[#C9A84C]/15 px-3 py-1 rounded-full text-xs text-[#C9A84C] font-mono font-medium">
                           Progreso total: {Object.values(completedDays).filter(Boolean).length} de 30 completados
@@ -4070,7 +2718,7 @@ export default function App() {
                         <div className="bg-[#181818] border border-white/5 rounded-2xl p-5 sm:p-6 space-y-4">
                           <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 border-b border-white/5 pb-3">
                             <div>
-                              <span className="text-[9px] uppercase font-bold text-[#C9A84C] font-mono">Enfoque del Día {selectedDayIndex + 1}</span>
+                              <span className="text-[9px] uppercase font-bold text-[#C9A84C] font-mono">Enfoque del Día {selectedDayIndex + 1} · {elementForDay(selectedDayIndex + 1).titulo}</span>
                               <h5 className="text-white font-bold text-sm tracking-wide">{aiDiagnosis.fase6[selectedDayIndex].enfoque}</h5>
                             </div>
                             
@@ -4130,288 +2778,56 @@ export default function App() {
                   </motion.div>
                 )}
 
-                {/* TAB 3: 📈 Fase 7: Registro de Progreso y Evaluación Semanal */}
-                {activeTab === 3 && (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="space-y-8 max-w-2xl mx-auto"
+                {/* Cierre: lo que probablemente estás enfrentando y cómo Dios lo redime */}
+                <div className="bg-[#0F1411] border border-[#C9A84C]/25 p-6 sm:p-8 rounded-3xl space-y-4">
+                  <span className="text-[10px] text-[#C9A84C] font-mono tracking-wider uppercase font-bold block">
+                    Para cerrar
+                  </span>
+                  <h3 className="text-xl font-bold font-display text-white leading-snug">
+                    Muy probablemente estás lidiando con esta creencia{results.length > 1 ? ' o creencias' : ''}:
+                  </h3>
+                  <ul className="space-y-1.5">
+                    {results.slice(0, 3).map((r: any, idx: number) => (
+                      <li key={idx} className="text-white/85 text-sm leading-relaxed">
+                        • <strong className="text-white">{r?.alias || r?.creencia}</strong>{r?.creencia && r?.alias ? ` — ${r.creencia}` : ''}
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="text-white/80 text-sm leading-relaxed">
+                    La forma en que Dios puede redimirlas es: {results[0]?.verdad || 'cambiar la mentira por la verdad de su Palabra y caminarla un día a la vez'}.
+                    Por eso tu plan se sostiene en {CITA_BASE}: confía en Él, contesta a su llamado, confiesa tu necesidad de Él y consagra todo. Él es quien endereza tus veredas.
+                  </p>
+                </div>
+
+                {/* Acciones finales: PDF y acompañamiento */}
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4 border-t border-white/5">
+                  <a
+                    href={`https://wa.me/${whatsappNumber.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Hola, completé el autoexamen Qué me detiene en Levántate Resplandece. Mi creencia principal fue «${results[0]?.alias || 'una creencia limitante'}». Quisiera agendar una sesión de acompañamiento pastoral.`)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="bg-[#25D366] hover:bg-[#20ba56] text-[#0A0A0A] font-bold px-6 py-3.5 rounded-xl text-sm flex items-center justify-center gap-2 shadow-xl hover:scale-[1.02] transition-all w-full sm:w-auto cursor-pointer"
                   >
-                    <div className="space-y-2 pt-2 text-center">
-                      <span className="text-[#C9A84C] font-mono text-xs uppercase tracking-[0.2em] font-semibold block">FASE 7: REGISTRO Y MONITOREO DE EVOLUCIÓN</span>
-                      <h4 className="text-2xl font-bold font-display text-white">Escala Semanal de Ajuste</h4>
-                      <p className="text-white/60 text-xs max-w-sm mx-auto leading-relaxed">
-                        Mueve los controles deslizantes de acuerdo con las percepciones de tu estado emocional y conductual para esta semana. El pastor-clínico te dará retroalimentación instantánea.
-                      </p>
-                    </div>
+                    <MessageSquare className="w-4 h-4 text-[#0A0A0A]" />
+                    Agenda una sesión de acompañamiento
+                  </a>
 
-                    <div className="bg-[#141414] border border-white/5 rounded-3xl p-6 space-y-6 shadow-inner">
-                      {/* Anxiety Slider (lower is better) */}
-                      <div className="space-y-2">
-                        <div className="flex justify-between items-center text-xs">
-                          <label className="text-white/80 font-bold flex items-center gap-1.5 font-sans">
-                            🔻 Nivel de Ansiedad y Tensión Corporal
-                          </label>
-                          <span className="font-mono text-[#C9A84C] font-bold">{progressScores.anxiety} / 10</span>
-                        </div>
-                        <input
-                          type="range"
-                          min="1"
-                          max="10"
-                          value={progressScores.anxiety}
-                          onChange={(e) => setProgressScores(prev => ({ ...prev, anxiety: parseInt(e.target.value, 10) }))}
-                          className="w-full h-1.5 bg-[#202020] rounded-lg appearance-none cursor-pointer accent-[#C9A84C]"
-                        />
-                        <div className="flex justify-between text-[9px] text-white/30 font-mono">
-                          <span>1. Paz Absoluta</span>
-                          <span>10. Pánico e Impaciencia</span>
-                        </div>
-                      </div>
-
-                      {/* Confidence Slider (higher is better) */}
-                      <div className="space-y-2">
-                        <div className="flex justify-between items-center text-xs">
-                          <label className="text-white/80 font-bold flex items-center gap-1.5 font-sans">
-                            🛡️ Confianza en tu Capacidad Proveniente de Gracia
-                          </label>
-                          <span className="font-mono text-[#C9A84C] font-bold">{progressScores.confidence} / 10</span>
-                        </div>
-                        <input
-                          type="range"
-                          min="1"
-                          max="10"
-                          value={progressScores.confidence}
-                          onChange={(e) => setProgressScores(prev => ({ ...prev, confidence: parseInt(e.target.value, 10) }))}
-                          className="w-full h-1.5 bg-[#202020] rounded-lg appearance-none cursor-pointer accent-[#C9A84C]"
-                        />
-                        <div className="flex justify-between text-[9px] text-white/30 font-mono">
-                          <span>1. Incompetente / Frustración</span>
-                          <span>10. Totalmente Capaz en Cristo</span>
-                        </div>
-                      </div>
-
-                      {/* Obedience Slider (higher is better) */}
-                      <div className="space-y-2">
-                        <div className="flex justify-between items-center text-xs">
-                          <label className="text-white/80 font-bold flex items-center gap-1.5 font-sans">
-                            🌱 Obediencia y Toma de Acciones Incómodas de Fe
-                          </label>
-                          <span className="font-mono text-[#C9A84C] font-bold">{progressScores.obedience} / 10</span>
-                        </div>
-                        <input
-                          type="range"
-                          min="1"
-                          max="10"
-                          value={progressScores.obedience}
-                          onChange={(e) => setProgressScores(prev => ({ ...prev, obedience: parseInt(e.target.value, 10) }))}
-                          className="w-full h-1.5 bg-[#202020] rounded-lg appearance-none cursor-pointer accent-[#C9A84C]"
-                        />
-                        <div className="flex justify-between text-[9px] text-white/30 font-mono">
-                          <span>1. Paralizado / Evitativo</span>
-                          <span>10. Obediencia Radical</span>
-                        </div>
-                      </div>
-
-                      {/* Hope Slider (higher is better) */}
-                      <div className="space-y-2">
-                        <div className="flex justify-between items-center text-xs">
-                          <label className="text-white/80 font-bold flex items-center gap-1.5 font-sans">
-                            🕊️ Esperanza de Filiación (Mirada sobre tu porvenir divino)
-                          </label>
-                          <span className="font-mono text-[#C9A84C] font-bold">{progressScores.hope} / 10</span>
-                        </div>
-                        <input
-                          type="range"
-                          min="1"
-                          max="10"
-                          value={progressScores.hope}
-                          onChange={(e) => setProgressScores(prev => ({ ...prev, hope: parseInt(e.target.value, 10) }))}
-                          className="w-full h-1.5 bg-[#202020] rounded-lg appearance-none cursor-pointer accent-[#C9A84C]"
-                        />
-                        <div className="flex justify-between text-[9px] text-white/30 font-mono">
-                          <span>1. Catastrofismo / Angustia</span>
-                          <span>10. Plena Certeza del Porvenir</span>
-                        </div>
-                      </div>
-
-                      {/* Frequency Slider (lower is better) */}
-                      <div className="space-y-2">
-                        <div className="flex justify-between items-center text-xs">
-                          <label className="text-white/80 font-bold flex items-center gap-1.5 font-sans">
-                            🧠 Frecuencia de Aparición del Pensamiento Limitante
-                          </label>
-                          <span className="font-mono text-[#C9A84C] font-bold">{progressScores.frequency} / 10</span>
-                        </div>
-                        <input
-                          type="range"
-                          min="1"
-                          max="10"
-                          value={progressScores.frequency}
-                          onChange={(e) => setProgressScores(prev => ({ ...prev, frequency: parseInt(e.target.value, 10) }))}
-                          className="w-full h-1.5 bg-[#202020] rounded-lg appearance-none cursor-pointer accent-[#C9A84C]"
-                        />
-                        <div className="flex justify-between text-[9px] text-white/30 font-mono">
-                          <span>1. Rara vez / Neutralizado</span>
-                          <span>10. Rumiación Severa</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Live Evaluation Commentary Panel */}
-                    {(() => {
-                      const evaluation = getProgressEvaluation(progressScores, userName);
-                      return (
-                        <div className={`p-6 rounded-2xl border ${evaluation.color} space-y-4`}>
-                          <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
-                            <div>
-                              <span className="text-[9px] uppercase font-bold text-white/50 block font-mono">Análisis Clínico-Pastoral</span>
-                              <h5 className="text-white font-bold text-sm">{evaluation.status}</h5>
-                            </div>
-                            <span className={`text-[10px] px-2.5 py-1 rounded-full font-bold self-start sm:self-center font-mono ${evaluation.badge}`}>
-                              Evaluando Nivel
-                            </span>
-                          </div>
-                          
-                          <p className="text-white/80 text-xs leading-relaxed italic font-serif">
-                             "{evaluation.commentary}"
-                          </p>
-                          <div className="pt-2">
-                            <button
-                              onClick={() => alert(`Guardamos tu evaluación de progreso semanal en tu perfil seguro localmente.`)}
-                              className="bg-white/5 hover:bg-white/10 text-white shadow p-2.5 rounded-xl text-xs font-mono border border-white/15 w-full cursor-pointer"
-                            >
-                               ✓ Guardar Monitoreo Semanal
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })()}
-                  </motion.div>
-                )}
-
-                {/* TAB 4: 🎓 Fase 8: Clausura, Itinerario de Resultados & Reporte Final */}
-                {activeTab === 4 && (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="space-y-8 max-w-3xl mx-auto"
+                  <button
+                    onClick={handleExportPDF}
+                    className="bg-gradient-to-r from-[#C9A84C] to-yellow-600 hover:from-yellow-400 hover:to-amber-500 text-[#0A0A0A] font-bold px-6 py-3.5 rounded-xl text-sm flex items-center justify-center gap-2 shadow-xl hover:scale-[1.02] transition-all w-full sm:w-auto cursor-pointer"
                   >
-                    {/* Comparative before/after */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
-                      <div className="bg-red-500/[0.01] border-l-4 border-l-red-500 border-y border-r border-[#301010] p-5 rounded-r-2xl space-y-2">
-                        <span className="text-[10px] text-red-400 font-mono font-bold uppercase block">1. Antes (Mente Esclavizada)</span>
-                        <p className="text-white/70 text-xs leading-relaxed italic">
-                          "{aiDiagnosis?.reporteFinal?.antes || 'Procedías bajo la tiranía del pánico al error o rechazo de los hombres, desgastando tu liderazgo y ocultando dones en hipervigilancia extrema.'}"
-                        </p>
-                      </div>
+                    <Download className="w-4 h-4 text-[#0A0A0A]" />
+                    Descargar mi resultado (PDF)
+                  </button>
+                </div>
 
-                      <div className="bg-[#0D1F13] border-l-4 border-l-emerald-400 border-y border-r border-[#10301A] p-5 rounded-r-2xl space-y-2">
-                        <span className="text-[10px] text-emerald-400 font-mono font-bold uppercase block">2. Ahora (Filiación Redimida)</span>
-                        <p className="text-[#DAF7E2] text-xs leading-relaxed italic font-semibold">
-                          "{aiDiagnosis?.reporteFinal?.ahora || 'Caminas asentado firmemente bajo la justificación de Cristo, obrando de reposo a labor con plena audacia de herencia incondicional.'}"
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Bento of report results */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="bg-[#141414] border border-white/5 p-5 rounded-2xl">
-                        <span className="text-[#C9A84C] font-mono text-[9px] uppercase font-bold block mb-1">Fortaleza Demolida</span>
-                        <p className="text-white/80 text-xs leading-relaxed">
-                          {aiDiagnosis?.reporteFinal?.creenciaDerribada || "Se rinde la idolatría de la meritocracia temporalista."}
-                        </p>
-                      </div>
-                      <div className="bg-[#141414] border border-white/5 p-5 rounded-2xl">
-                        <span className="text-[#C9A84C] font-mono text-[9px] uppercase font-bold block mb-1">Certeza Establecida</span>
-                        <p className="text-white/80 text-xs leading-relaxed font-semibold">
-                          {aiDiagnosis?.reporteFinal?.verdadEstablecida || "Tu suficiencia proviene de la herencia santa sellada en la cruz."}
-                        </p>
-                      </div>
-                      <div className="bg-[#141414] border border-white/5 p-5 rounded-2xl">
-                        <span className="text-[#C9A84C] font-mono text-[9px] uppercase font-bold block mb-1">Próximo Hábito Duradero</span>
-                        <p className="text-white/80 text-xs leading-relaxed">
-                          {aiDiagnosis?.reporteFinal?.proximoPaso || "Sostener un registro de evidencias conscientes de gracia de forma diaria."}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Exhortacion final */}
-                    <div className="bg-gradient-to-r from-emerald-500/10 to-emerald-600/10 border border-emerald-500/20 p-6 sm:p-8 rounded-2xl relative overflow-hidden">
-                      <span className="absolute -right-8 -bottom-8 text-emerald-500/5 pointer-events-none text-9xl font-serif">🙏</span>
-                      <h4 className="text-emerald-400 font-bold mb-2 flex items-center gap-1.5 text-xs uppercase tracking-wider font-mono">
-                        Exhortación Bíblica de Clausura
-                      </h4>
-                      <p className="text-emerald-50 italic leading-relaxed text-sm font-serif">
-                        "{aiDiagnosis?.reporteFinal?.exhortacionBiblica || 'Permanece firme en tu llamado, amado/a coheredero de Cristo. Estás justificado y revestido de herencia real para que Tus obras del Reino glorifiquen al Padre continuamente. Hebreos 12:1-2.'}"
-                      </p>
-                    </div>
-
-                    {/* Booking / Course action blocks (Josue's core marketing vectors) */}
-                    <div className="bg-[#121212] border border-white/5 rounded-3xl p-6 sm:p-8 grid grid-cols-1 md:grid-cols-2 gap-6 relative">
-                      <div className="space-y-4">
-                        <h4 className="text-white font-bold text-base font-display flex items-center gap-2">
-                           <MessageSquare className="w-5 h-5 text-[#C9A84C]" /> ¿Deseas consejería con respaldo?
-                        </h4>
-                        <p className="text-white/60 text-[11px] leading-relaxed">
-                          Si consideras que estos patrones o fortalezas mentales te han limitado por mucho tiempo, agenda una sesión especial de acompañamiento pastoral con el ministerio Levántate Resplandece.
-                        </p>
-                        <div className="flex gap-3 flex-wrap">
-                          <a 
-                            href={`https://wa.me/${whatsappNumber.replace(/[^0-9]/g, '')}?text=${encodeURIComponent('Hola, completé el test Qué me detiene de Transformación Interior y me gustaría agendar una sesión de acompañamiento pastoral.')}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="bg-[#25D366] hover:bg-[#20ba56] text-[#000] font-bold py-2 px-4 rounded-xl text-xs flex items-center gap-1.5 shadow-lg active:scale-95 transition-all"
-                          >
-                             Agendar por WhatsApp
-                          </a>
-                          <button 
-                            onClick={() => {
-                              setCopiedNotification(`Enlace de reserva preparado para: ${userEmail || 'tu correo registrado'}`);
-                              setTimeout(() => setCopiedNotification(null), 4000);
-                            }}
-                            className="bg-white/5 hover:bg-white/10 text-white border border-white/10 font-bold py-2 px-3 rounded-xl text-[10px] transition-colors cursor-pointer"
-                          >
-                            Recibir enlace
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="space-y-4 md:border-l md:border-white/5 md:pl-6">
-                        <h4 className="text-white font-bold text-base font-display flex items-center gap-2">
-                           <BookOpen className="w-5 h-5 text-indigo-400" /> Programa Mente Renovada
-                        </h4>
-                        <p className="text-white/60 text-[11px] leading-relaxed">
-                          Únete a nuestro seminario intensivo diseñado para desmantelar de forma conductual y espiritual fortalezas inconscientes e instalar mentes del Reino.
-                        </p>
-                        <a 
-                          href="https://levantateresplandece1136.com/renovacion"
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 px-4 rounded-xl text-xs items-center gap-1.5 transition-colors shadow-lg active:scale-95"
-                        >
-                          Explorar Curso Completo
-                        </a>
-                      </div>
-                    </div>
-
-                    {/* Exporter and reset buttons */}
-                    <div className="flex flex-col sm:flex-row justify-center gap-4 pt-4">
-                      <button 
-                        onClick={handleExportPDF}
-                        className="bg-gradient-to-r from-[#C9A84C] to-yellow-600 text-[#0D0D0D] font-bold px-10 py-4 rounded-xl text-base shadow-xl hover:-translate-y-0.5 transition-all flex items-center justify-center gap-3 w-full sm:w-auto cursor-pointer"
-                      >
-                        <Download className="w-5 h-5" /> Descargar mi Guía de 30 Días (PDF)
-                      </button>
-
-                      <button 
-                        onClick={restartJourney}
-                        className="flex items-center justify-center gap-2 px-8 py-4 rounded-xl font-bold bg-[#1C1C1C] hover:bg-[#262626] border border-white/5 text-white/70 hover:text-white transition-all w-full sm:w-auto cursor-pointer"
-                      >
-                        <RefreshCcw className="w-4 h-4" /> Resetear Evaluación
-                      </button>
-                    </div>
-                  </motion.div>
-                )}
+                <div className="text-center pt-1">
+                  <button
+                    onClick={restartJourney}
+                    className="text-[11px] text-white/40 hover:text-white/70 underline cursor-pointer"
+                  >
+                    Volver a hacer el autoexamen
+                  </button>
+                </div>
               </motion.div>
             )}
 

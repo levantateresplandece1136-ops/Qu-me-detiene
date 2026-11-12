@@ -26,7 +26,6 @@ export interface GuidedExplorationFlowProps {
   // Stage mode props (Etapas 03–06)
   stageQuestion?: HeartStageQuestion;
   selectedOptions?: string[];
-  dominantAreaTitle?: string;
   onToggleOption?: (optionId: string) => void;
 
   // Validation mode props (Etapa 07)
@@ -69,7 +68,6 @@ export const GuidedExplorationFlow: React.FC<GuidedExplorationFlowProps> = ({
   deepDiveAnswers = {},
   stageQuestion,
   selectedOptions = [],
-  dominantAreaTitle = '',
   onToggleOption,
   validationTarget,
   validationIndex = 0,
@@ -240,11 +238,6 @@ export const GuidedExplorationFlow: React.FC<GuidedExplorationFlowProps> = ({
           <div className="absolute top-0 inset-x-0 h-[1.5px] bg-gradient-to-r from-transparent via-[#C9A84C]/40 to-transparent" />
 
           <div className="text-center space-y-3">
-            <div>
-              <span className="inline-block text-[11px] font-mono uppercase tracking-wider text-[#C9A84C] bg-[#C9A84C]/10 border border-[#C9A84C]/25 px-3 py-1 rounded-full font-bold">
-                Posible conexión: {validationTarget.blockA.name} ↔ {validationTarget.blockB.name}
-              </span>
-            </div>
 
             <p className="text-lg sm:text-2xl text-white font-serif leading-relaxed max-w-xl mx-auto py-1 sm:py-2">
               "{validationTarget.preguntaClave}"
@@ -328,7 +321,7 @@ export const GuidedExplorationFlow: React.FC<GuidedExplorationFlowProps> = ({
     const questionNumber = stageQuestion.stage - 2; // stage 3 -> 1, stage 4 -> 2, stage 5 -> 3, stage 6 -> 4
     const stageProgressPercent = (questionNumber / 4) * 100;
     const canContinue = selectedOptions.length > 0;
-    const promptText = fillStagePrompt(stageQuestion.prompt, dominantAreaTitle || 'tu vida');
+    const promptText = fillStagePrompt(stageQuestion.prompt, 'mi vida');
 
     return (
       <motion.div
@@ -382,13 +375,6 @@ export const GuidedExplorationFlow: React.FC<GuidedExplorationFlowProps> = ({
             <p className="text-lg sm:text-2xl text-white font-serif leading-relaxed max-w-xl mx-auto py-1 sm:py-2">
               "{promptText}"
             </p>
-            {dominantAreaTitle && (
-              <div className="pt-1">
-                <span className="inline-block text-[11px] font-mono text-white/50 bg-white/5 border border-white/10 px-3 py-1 rounded-full">
-                  Área: {dominantAreaTitle}
-                </span>
-              </div>
-            )}
           </div>
 
           {/* 3. Opciones seleccionables apiladas en móvil */}
@@ -567,13 +553,6 @@ export const GuidedExplorationFlow: React.FC<GuidedExplorationFlowProps> = ({
             <p className="text-lg sm:text-2xl text-white font-serif italic leading-relaxed sm:leading-loose max-w-xl mx-auto py-1 sm:py-2">
               "{currentQuestion?.afirmacionTest || ''}"
             </p>
-            {currentQuestion?.bloque && (
-              <div className="pt-1">
-                <span className="inline-block text-[11px] font-mono text-white/50 bg-white/5 border border-white/10 px-3 py-1 rounded-full">
-                  Área: {currentQuestion.bloque}
-                </span>
-              </div>
-            )}
           </div>
 
           {/* 3. Las 3 opciones (2, 1, 0) */}
@@ -756,9 +735,6 @@ export const GuidedExplorationFlow: React.FC<GuidedExplorationFlowProps> = ({
         <div className="absolute top-0 inset-x-0 h-[1.5px] bg-gradient-to-r from-transparent via-[#C9A84C]/40 to-transparent" />
 
         <div className="text-center space-y-2">
-          <span className="text-[10px] uppercase font-mono tracking-widest text-[#C9A84C] font-bold block">
-            {currentBlock.title}
-          </span>
           <p className="text-lg sm:text-2xl text-white font-serif italic leading-relaxed sm:leading-loose max-w-xl mx-auto py-1 sm:py-2">
             "{currentBlock.screeningPhrase}"
           </p>
@@ -855,16 +831,15 @@ export const GuidedExplorationFlow: React.FC<GuidedExplorationFlowProps> = ({
           {regionKeys.map((key, idx) => {
             const isAnswered = screeningAnswers[key] !== undefined;
             const isCurrent = currentSelectedRegion === key;
-            const blockInfo = bloquesDiagnostico[key];
 
             return (
               <button
                 key={key}
                 type="button"
                 onClick={() => onSelectRegion?.(key)}
-                title={`${idx + 1}. ${blockInfo?.title || key}${isAnswered ? ' (Respondida)' : ''}`}
+                title={`Área ${idx + 1}${isAnswered ? ' (Respondida)' : ''}`}
                 className="group relative p-1.5 sm:p-2 cursor-pointer transition-transform hover:scale-110 focus:outline-none"
-                aria-label={`Ir al área ${idx + 1}: ${blockInfo?.title || key}`}
+                aria-label={`Ir al área ${idx + 1}`}
               >
                 <div
                   className={`w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full transition-all flex items-center justify-center text-[8px] font-mono ${
