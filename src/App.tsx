@@ -40,6 +40,7 @@ import { practicalStepsByBlock } from './data/practicalSteps';
 import { blockDefinitions, detectBlockInteractions, DetectedInteraction, BlockDefinition } from './data/blockDefinitions';
 import { generateFallbackData, AIDiagnosis } from './utils/fallbackGenerator';
 import { downloadPDFResults } from './utils/pdfGenerator';
+import { PLAN_PROVERBIOS, CITA_BASE, TEXTO_CITA_BASE, elementForDay, elementLines } from './utils/planProverbios';
 import GoldenCelebration from './components/GoldenCelebration';
 import { SIMULATED_CASE_19 } from './data/counselingMovements';
 import GuidedExplorationFlow from './components/GuidedExplorationFlow';
@@ -2611,20 +2612,23 @@ export default function App() {
                       Tu plan para romper «{results[0]?.alias || 'esta creencia'}» y vivir redimido
                     </h3>
                   </div>
+                  <div className="bg-[#0F1411] border border-[#C9A84C]/25 p-5 rounded-2xl space-y-2">
+                    <span className="text-[10px] text-[#C9A84C] font-mono tracking-wider uppercase font-bold block">
+                      Cita base de tu plan · {CITA_BASE}
+                    </span>
+                    <p className="text-emerald-100 text-sm font-serif italic leading-relaxed">
+                      “{TEXTO_CITA_BASE}”
+                    </p>
+                  </div>
                   <p className="text-xs text-white/60 leading-relaxed">
-                    No es igual para todos: nace de la creencia que tu autoexamen detectó. Cuatro semanas, un día a la vez.
+                    No es igual para todos: nace de la creencia que tu autoexamen detectó. Cuatro elementos, un día a la vez.
                   </p>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {[
-                      { semana: 'Semana 1 · Consciencia', objetivo: aiDiagnosis?.fase5?.semana1?.objetivo || 'Detectar la mentira en tu diálogo interior' },
-                      { semana: 'Semana 2 · Desmantelamiento', objetivo: aiDiagnosis?.fase5?.semana2?.objetivo || 'Debilitar la creencia con evidencias de la fidelidad de Dios' },
-                      { semana: 'Semana 3 · Renovación', objetivo: aiDiagnosis?.fase5?.semana3?.objetivo || 'Instalar la verdad con meditación diaria' },
-                      { semana: 'Semana 4 · Consolidación', objetivo: aiDiagnosis?.fase5?.semana4?.objetivo || 'Vivir la libertad con pasos de obediencia' },
-                    ].map((w) => (
-                      <div key={w.semana} className="bg-[#161616] border border-white/5 p-4 rounded-2xl space-y-1">
-                        <span className="text-[10px] font-mono font-bold text-[#C9A84C] uppercase block">{w.semana}</span>
-                        <p className="text-white/85 text-xs leading-relaxed">{w.objetivo}</p>
+                    {PLAN_PROVERBIOS.map((el) => (
+                      <div key={el.id} className="bg-[#161616] border border-white/5 p-4 rounded-2xl space-y-1">
+                        <span className="text-[10px] font-mono font-bold text-[#C9A84C] uppercase block">{el.numero}. {el.titulo} · Días {el.diasInicio}–{el.diasFin}</span>
+                        <p className="text-white/85 text-xs leading-relaxed">Tiene que ver con {el.tieneQueVer.toLowerCase()}: {el.hacer.toLowerCase()}.</p>
                       </div>
                     ))}
                   </div>
@@ -2635,65 +2639,35 @@ export default function App() {
                     animate={{ opacity: 1 }}
                     className="space-y-8"
                   >
-                    {/* FASE 5: Hoja de ruta semanal */}
+                    {/* LOS 4 ELEMENTOS DEL PLAN · PROVERBIOS 3:5-9 */}
                     <div className="space-y-4 pt-2">
                       <div className="flex items-center gap-2 text-[#C9A84C]">
                         <Calendar className="w-5 h-5" />
-                        <h4 className="text-base font-bold font-display uppercase tracking-wider font-mono">Semana a semana</h4>
+                        <h4 className="text-base font-bold font-display uppercase tracking-wider font-mono">Los 4 elementos de tu plan</h4>
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* Week 1 */}
-                        <div className="bg-[#141414] border-l-4 border-l-indigo-400 p-5 rounded-r-2xl space-y-3 border-y border-r border-white/5">
-                          <span className="text-[10px] text-indigo-400 font-mono font-bold uppercase block">Semana 1: Consciencia Mental</span>
-                          <h4 className="text-white font-bold text-sm">{aiDiagnosis?.fase5?.semana1?.objetivo || "Detectar la mentira en tu diálogo interior"}</h4>
-                          <p className="text-white/60 text-xs leading-relaxed italic">"{aiDiagnosis?.fase5?.semana1?.reflexion || "Registrarás cada rumiar de insuficiencia que te quite la paz."}"</p>
-                          <div className="text-[11px] text-[#C9A84C] font-mono leading-relaxed bg-[#0D0D0D] p-3 rounded-lg border border-white/5">
-                            <strong>Pregunta Demoledora:</strong> {aiDiagnosis?.fase5?.semana1?.autoconfrontacion || "¿Le creo al acusador mundano o a mi Salvador?"}
-                          </div>
-                          <div className="border-t border-white/5 pt-2 text-[10px] text-white/40 leading-relaxed font-mono">
-                            <strong>Oración de Derribo:</strong> {aiDiagnosis?.fase5?.semana1?.oracionGuiada}
-                          </div>
-                        </div>
-
-                        {/* Week 2 */}
-                        <div className="bg-[#141414] border-l-4 border-l-emerald-400 p-5 rounded-r-2xl space-y-3 border-y border-r border-white/5">
-                          <span className="text-[10px] text-emerald-400 font-mono font-bold uppercase block">Semana 2: Desmantelamiento Cognitivo</span>
-                          <h4 className="text-white font-bold text-sm">{aiDiagnosis?.fase5?.semana2?.objetivo || "Debilitar la creencia mediante evidencias"}</h4>
-                          <p className="text-white/60 text-xs leading-relaxed italic">"{aiDiagnosis?.fase5?.semana2?.reencuadreBiblico || "Buscarás evidencias del cuidado de Dios contradiciendo el pánico de escasez."}"</p>
-                          <div className="text-[11px] text-[#C9A84C] font-mono leading-relaxed bg-[#0D0D0D] p-3 rounded-lg border border-white/5">
-                            <strong>Desafíos Conductuales:</strong> {aiDiagnosis?.fase5?.semana2?.desafiosPracticos || "Toma decisiones sin pedir aprobación redundante."}
-                          </div>
-                          <div className="border-t border-white/5 pt-2 text-[10px] text-white/40 leading-relaxed font-mono">
-                            <strong>Anclaje Neural:</strong> {aiDiagnosis?.fase5?.semana2?.interrupcionPatrones || "Pon tu mano en el pecho al sentir pánico y susurra: 'Su gracia es mi ancla'."}
-                          </div>
-                        </div>
-
-                        {/* Week 3 */}
-                        <div className="bg-[#141414] border-l-4 border-l-amber-500 p-5 rounded-r-2xl space-y-3 border-y border-r border-white/5">
-                          <span className="text-[10px] text-[#C9A84C] font-mono font-bold uppercase block">Semana 3: Renovación y Cableado Nuevo</span>
-                          <h4 className="text-white font-bold text-sm">{aiDiagnosis?.fase5?.semana3?.objetivo || "Instalar nuevas autopistas de fe"}</h4>
-                          <p className="text-white/60 text-xs leading-relaxed italic">"{aiDiagnosis?.fase5?.semana3?.meditacionDiaria || "Integrarás la ruminación rítmica y la gratitud incondicional."}"</p>
-                          <div className="text-[11px] text-[#C9A84C] font-mono leading-relaxed bg-[#0D0D0D] p-3 rounded-lg border border-white/5">
-                            <strong>Memorización de Pasaje:</strong> {aiDiagnosis?.fase5?.semana3?.memorizacionVersiculo || "Visualiza el versículo en post-it de tu baño o celular."}
-                          </div>
-                          <div className="border-t border-white/5 pt-2 text-[10px] text-white/40 leading-relaxed font-mono">
-                            <strong>Visualización Cristocéntrica:</strong> {aiDiagnosis?.fase5?.semana3?.visualizacionBiblica || "Ensaya mentalmente por la noche actuando en paz."}
-                          </div>
-                        </div>
-
-                        {/* Week 4 */}
-                        <div className="bg-[#141414] border-l-4 border-l-rose-400 p-5 rounded-r-2xl space-y-3 border-y border-r border-white/5">
-                          <span className="text-[10px] text-rose-400 font-mono font-bold uppercase block">Semana 4: Consolidación y Obediencia de Fe</span>
-                          <h4 className="text-white font-bold text-sm">{aiDiagnosis?.fase5?.semana4?.objetivo || "Vivir bajo soberana filiación"}</h4>
-                          <p className="text-white/60 text-xs leading-relaxed italic">"{aiDiagnosis?.fase5?.semana4?.retosReales || "Levanta la mano en tareas de incomodidad confiada."}"</p>
-                          <div className="text-[11px] text-[#C9A84C] font-mono leading-relaxed bg-[#0D0D0D] p-3 rounded-lg border border-white/5">
-                            <strong>Porvenir de Hijo:</strong> {aiDiagnosis?.fase5?.semana4?.accionesFe || "Ofrece un acto de extrema generosidad."}
-                          </div>
-                          <div className="border-t border-white/5 pt-2 text-[10px] text-white/40 leading-relaxed font-mono">
-                            <strong>Paso de Obediencia:</strong> {aiDiagnosis?.fase5?.semana4?.pasosObediencia || "Acepta ese puesto ministerial o encargo pastoral que habías pospuesto."}
-                          </div>
-                        </div>
+                        {PLAN_PROVERBIOS.map((el) => {
+                          const semana = [aiDiagnosis?.fase5?.semana1, aiDiagnosis?.fase5?.semana2, aiDiagnosis?.fase5?.semana3, aiDiagnosis?.fase5?.semana4][el.semanaIndex] as any;
+                          return (
+                            <div key={el.id} className="bg-[#141414] border-l-4 border-l-[#C9A84C] p-5 rounded-r-2xl space-y-3 border-y border-r border-white/5">
+                              <span className="text-[10px] text-[#C9A84C] font-mono font-bold uppercase block">{el.numero}. {el.titulo} · Días {el.diasInicio}–{el.diasFin}</span>
+                              <ul className="space-y-1.5 text-xs leading-relaxed">
+                                {elementLines(el).map((l) => (
+                                  <li key={l.label} className="text-white/80">
+                                    <strong className="text-white">{l.label}:</strong> {l.text}
+                                  </li>
+                                ))}
+                              </ul>
+                              {semana?.objetivo && (
+                                <div className="border-t border-white/5 pt-2 text-[11px] text-white/60 leading-relaxed">
+                                  <strong className="text-[#C9A84C]">Enfoque de la semana:</strong> {semana.objetivo}
+                                  {semana.reflexion && <span className="block italic mt-1">“{semana.reflexion}”</span>}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
 
@@ -2703,6 +2677,9 @@ export default function App() {
                         <div className="space-y-1">
                           <span className="text-[10px] uppercase font-bold text-[#C9A84C] font-mono block">Día a día</span>
                           <h4 className="text-lg font-bold font-display text-white">Interactiva tu agenda de 30 días</h4>
+                          <p className="text-white/50 text-xs leading-relaxed">
+                            {PLAN_PROVERBIOS.map((el) => `Días ${el.diasInicio}–${el.diasFin}: ${el.titulo}`).join(' · ')}
+                          </p>
                         </div>
                         <span className="bg-[#C9A84C]/5 border border-[#C9A84C]/15 px-3 py-1 rounded-full text-xs text-[#C9A84C] font-mono font-medium">
                           Progreso total: {Object.values(completedDays).filter(Boolean).length} de 30 completados
@@ -2741,7 +2718,7 @@ export default function App() {
                         <div className="bg-[#181818] border border-white/5 rounded-2xl p-5 sm:p-6 space-y-4">
                           <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 border-b border-white/5 pb-3">
                             <div>
-                              <span className="text-[9px] uppercase font-bold text-[#C9A84C] font-mono">Enfoque del Día {selectedDayIndex + 1}</span>
+                              <span className="text-[9px] uppercase font-bold text-[#C9A84C] font-mono">Enfoque del Día {selectedDayIndex + 1} · {elementForDay(selectedDayIndex + 1).titulo}</span>
                               <h5 className="text-white font-bold text-sm tracking-wide">{aiDiagnosis.fase6[selectedDayIndex].enfoque}</h5>
                             </div>
                             
@@ -2800,6 +2777,27 @@ export default function App() {
                     </div>
                   </motion.div>
                 )}
+
+                {/* Cierre: lo que probablemente estás enfrentando y cómo Dios lo redime */}
+                <div className="bg-[#0F1411] border border-[#C9A84C]/25 p-6 sm:p-8 rounded-3xl space-y-4">
+                  <span className="text-[10px] text-[#C9A84C] font-mono tracking-wider uppercase font-bold block">
+                    Para cerrar
+                  </span>
+                  <h3 className="text-xl font-bold font-display text-white leading-snug">
+                    Muy probablemente estás lidiando con esta creencia{results.length > 1 ? ' o creencias' : ''}:
+                  </h3>
+                  <ul className="space-y-1.5">
+                    {results.slice(0, 3).map((r: any, idx: number) => (
+                      <li key={idx} className="text-white/85 text-sm leading-relaxed">
+                        • <strong className="text-white">{r?.alias || r?.creencia}</strong>{r?.creencia && r?.alias ? ` — ${r.creencia}` : ''}
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="text-white/80 text-sm leading-relaxed">
+                    La forma en que Dios puede redimirlas es: {results[0]?.verdad || 'cambiar la mentira por la verdad de su Palabra y caminarla un día a la vez'}.
+                    Por eso tu plan se sostiene en {CITA_BASE}: confía en Él, contesta a su llamado, confiesa tu necesidad de Él y consagra todo. Él es quien endereza tus veredas.
+                  </p>
+                </div>
 
                 {/* Acciones finales: PDF y acompañamiento */}
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4 border-t border-white/5">
