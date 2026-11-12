@@ -99,28 +99,7 @@ const getProgressEvaluation = (scores: Record<string, number>, name: string) => 
 const getPastoralConversationalFeedback = (blockId: string, score: number, name: string) => {
   const formattedName = name ? name.trim() : "amigo/a";
   if (score >= 4) {
-    switch (blockId) {
-      case "capacidad-identidad":
-        return `Comprendo esa sensación, ${formattedName}. La voz que te exige estar siempre a la altura puede ser muy agotadora. Recuerda que tu verdadero valor y suficiencia provienen de Dios (2 Corintios 3:5).`;
-      case "merecimiento-vinculo":
-        return `Entiendo el temor a que la calma no dure, ${formattedName}. Cuando nos acostumbramos a la tensión, cuesta recibir la paz. Pero la bondad de Dios es sincera y no tiene condiciones ocultas.`;
-      case "control-entorno":
-        return `Estás cargando el peso de resolverlo todo en tus propias fuerzas, ${formattedName}. Respira hondo... Dios cuida de ti con amor y fidelidad día tras día.`;
-      case "rendimiento-logro":
-        return `Querido/a ${formattedName}, descansar no es un error. Tu dignidad no depende de cuánto produces, sino del amor incondicional con el que Dios te mira.`;
-      case "relaciones-poder":
-        return `Guardar silencio por temor al conflicto deja un gran desgaste interior, ${formattedName}. Dios te da sabiduría para hablar la verdad con amor y poner límites sanos con serenidad.`;
-      case "cuerpo-salud":
-        return `El descanso no es tiempo perdido, ${formattedName}; es parte del cuidado responsable del templo que Dios te ha confiado.`;
-      case "espiritualidad-trascendencia":
-        return `A veces la rutina o las dudas hacen sentir lejana la presencia de Dios, ${formattedName}. Pero Él te conoce, te ama y permanece cerca aun en los momentos de silencio.`;
-      case "tiempo-futuro":
-        return `La prisa y la preocupación por el mañana desgastan el presente, ${formattedName}. Tu tiempo está en las manos de Dios y su paz te acompaña hoy.`;
-      case "genero-identidad-social":
-        return `Las etiquetas que otros pusieron sobre tu historia no definen tu futuro, ${formattedName}. En Cristo tienes una nueva identidad y un propósito claro.`;
-      default:
-        return `Gracias por tu honestidad, ${formattedName}. Reconocer lo que sentimos es siempre el primer paso hacia la libertad.`;
-    }
+    return `Gracias por tu honestidad, ${formattedName}. Reconocer lo que sientes es siempre el primer paso hacia la libertad.`;
   } else if (score === 3) {
     return `Reconocer que esta situación ocurre a veces es un paso muy valioso, ${formattedName}. Poco a poco la verdad irá trayendo mayor claridad y descanso.`;
   } else {
@@ -622,9 +601,9 @@ export default function App() {
       // Award XP for first discovery of this region (only if not already answered)
       if (!alreadyAnswered) {
         setUserXp(currentXp => currentXp + 30);
-        setXpNotification({ 
-          xp: 30, 
-          label: `¡Región "${bloquesDiagnostico[regionId as keyof typeof bloquesDiagnostico]?.title}" Explorada!` 
+        setXpNotification({
+          xp: 30,
+          label: "¡Región explorada!"
         });
         setTimeout(() => setXpNotification(null), 3000);
       }
@@ -661,7 +640,7 @@ export default function App() {
     );
     if (newPattern) {
       shownPatternsRef.current.add(newPattern.id);
-      setEmergingPattern(`${newPattern.blockA.name} y ${newPattern.blockB.name} tienden a ir juntos en tus respuestas. Lo exploraremos más adelante.`);
+      setEmergingPattern('Hay un patrón que emerge en tus respuestas. Lo exploraremos más adelante.');
     } else {
       setEmergingPattern('');
     }
@@ -790,7 +769,7 @@ export default function App() {
       scoredBeliefIdsRef.current.add(currentQuestion.id);
       // Award XP (15 XP for cataloging each deep belief node)
       setUserXp(currentXp => currentXp + 15);
-      setXpNotification({ xp: 15, label: `Explorando: ${currentQuestion.bloque}` });
+      setXpNotification({ xp: 15, label: "Afirmación registrada" });
       setTimeout(() => setXpNotification(null), 3000);
     }
 
@@ -914,26 +893,11 @@ export default function App() {
 
   // Fase 4A: micro-insight de una sola oración, calculado con datos reales (nunca con una sola respuesta)
   const getStageInsight = (from: 1 | 2 | 6 | null): string => {
-    const titleOf = (id: string) => (bloquesDiagnostico as any)[id]?.title || id;
     if (from === 1) {
-      const high = Object.entries(screeningAnswers)
-        .filter(([, sc]) => (sc as number) >= 4)
-        .sort((a, b) => (b[1] as number) - (a[1] as number))
-        .map(([id]) => titleOf(id));
-      if (high.length >= 2) return `Tus respuestas muestran más resonancia en ${high[0]} y ${high[1]}. Ahora veremos qué pensamientos hay detrás.`;
-      if (high.length === 1) return `${high[0]} es el área donde más resonaron tus respuestas. Ahora veremos qué pensamientos hay detrás.`;
-      return 'Tus respuestas son bastante equilibradas; exploraremos las áreas que más resonaron.';
+      return 'Tus respuestas muestran más resonancia en algunas áreas. Ahora veremos qué pensamientos hay detrás.';
     }
     if (from === 2) {
-      const strongByBlock: Record<string, number> = {};
-      deepDiveQuestions.forEach(q => {
-        if (deepDiveAnswers[q.id] === 2) {
-          strongByBlock[q.bloqueId] = (strongByBlock[q.bloqueId] || 0) + 1;
-        }
-      });
-      const top = Object.entries(strongByBlock).sort((a, b) => b[1] - a[1])[0];
-      if (top && top[1] >= 2) return `Varias afirmaciones sobre ${titleOf(top[0])} resonaron contigo con fuerza. Ahora exploraremos qué buscas y qué temes.`;
-      return 'Algunas afirmaciones resonaron más que otras. Ahora exploraremos qué buscas y qué temes.';
+      return 'Algunas afirmaciones resonaron contigo con fuerza. Ahora exploraremos qué buscas y qué temes.';
     }
     if (from === 6) {
       const related = new Set<string>();
@@ -1935,8 +1899,8 @@ export default function App() {
                             </div>
 
                             <div className="space-y-0.5 mt-2">
-                              <h4 className="text-[11px] font-bold text-white leading-tight font-sans tracking-tight">{reg.title}</h4>
-                              <p className="text-[9px] text-white/40 line-clamp-1">{reg.desc}</p>
+                              <h4 className="text-[11px] font-bold text-white leading-tight font-sans tracking-tight">Región {idx + 1}</h4>
+                              <p className="text-[9px] text-white/40 line-clamp-1">Área por explorar</p>
                             </div>
 
                             {/* Node Status Badge */}
@@ -1980,9 +1944,6 @@ export default function App() {
                           })()}
                         </div>
                         <div>
-                          <h4 className="text-white font-bold text-sm tracking-tight font-sans">
-                            {bloquesDiagnostico[currentSelectedRegion as keyof typeof bloquesDiagnostico]?.title || 'Capacidad & Identidad'}
-                          </h4>
                           <span className="text-[10px] font-mono text-[#C9A84C] uppercase tracking-widest font-semibold block">Rastreo de Activación</span>
                         </div>
                       </div>
@@ -1996,15 +1957,7 @@ export default function App() {
                         <div className="space-y-1">
                           <span className="text-[9px] uppercase font-mono tracking-wider text-[#C9A84C] font-bold">Consejería del Territorio</span>
                           <p className="text-xs text-white/80 italic leading-relaxed font-sans">
-                            {currentSelectedRegion === 'capacidad-identidad' && `Hola ${userName}, descifremos la fortaleza de mentira de la incapacidad. ¿Temes no estar a la altura en público?`}
-                            {currentSelectedRegion === 'merecimiento-vinculo' && `Comprendo el temor, ${userName}. Siguiente paso: ¿aguarda tu mente que un rechazo o catástrofe imprevista ocurra para cobrarte facturas?`}
-                            {currentSelectedRegion === 'control-entorno' && `Analicemos qué tan obsesivo se vuelve el deseo de dominar lo incontrolable pretendiendo sostener todo en tus manos.`}
-                            {currentSelectedRegion === 'rendimiento-logro' && `Evaluemos si condicionas el valor intrínseco de tu alma a la acumulación y volumen de tus trofeos terrenales, ${userName}.`}
-                            {currentSelectedRegion === 'relaciones-poder' && `Indaguemos en el pánico a ser vulnerable o a colocar fronteras de paz en tus relaciones cotidianas por temor de abandono.`}
-                            {currentSelectedRegion === 'cuerpo-salud' && `Detrás de tu cansancio físico prolongado, ¿por qué sientes que reposar sin culpabilidad es un pecado del cual arrepentirse?`}
-                            {currentSelectedRegion === 'espiritualidad-trascendencia' && `¿Vivencias verdaderamente una filiación de gracia o percibes la lejanía divina como un veredicto frío?`}
-                            {currentSelectedRegion === 'tiempo-futuro' && `El tiempo corre. ¿Te paralizas ante la idea de tomar una sendera irreversible sintiendo escasez de oportunidades?`}
-                            {currentSelectedRegion === 'genero-identidad-social' && `¿Consideras que tus marcas heredadas de cuna o demográficas limitan eternamente tu unción de gracia?`}
+                            Responde con honestidad, {userName}: ¿cuánto resuena contigo esta afirmación?
                           </p>
                         </div>
                       </div>
@@ -2196,8 +2149,8 @@ export default function App() {
                     </div>
                     <div className="h-8 w-[1px] bg-white/10" />
                     <div className="text-right font-mono">
-                      <span className="text-white/40 text-[10px] block font-bold uppercase">Sectores Abismales</span>
-                      <span className="text-[#C9A84C] font-bold text-xs">{activeBlocks.length} Bloques Detectados</span>
+                      <span className="text-white/40 text-[10px] block font-bold uppercase">Exploración</span>
+                      <span className="text-[#C9A84C] font-bold text-xs">En curso</span>
                     </div>
                   </div>
                 </div>
@@ -2219,10 +2172,6 @@ export default function App() {
                         "{deepDiveQuestions[deepDiveIndex]?.afirmacionTest}"
                       </h3>
 
-                      <div className="inline-flex items-center gap-2 bg-[#C9A84C]/10 border border-[#C9A84C]/10 px-4 py-1.5 rounded-full text-xs text-[#C9A84C] font-semibold w-fit mx-auto self-center">
-                        <Lock className="w-3.5 h-3.5" />
-                        <span>Sectores: {deepDiveQuestions[deepDiveIndex]?.bloque}</span>
-                      </div>
                     </div>
 
                     {/* Highly Stylized Heart Dial responses */}
@@ -2328,7 +2277,6 @@ export default function App() {
                         <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
                           {activeBlocks.map((blockId, idx) => {
                             const isCurrent = deepDiveQuestions[deepDiveIndex]?.bloqueId === blockId;
-                            const blockName = bloquesDiagnostico[blockId as keyof typeof bloquesDiagnostico]?.title || blockId;
                             
                             // Check if this block questions have been answered or are being answered
                             // All questions for this block that have index < deepDiveIndex
@@ -2363,7 +2311,7 @@ export default function App() {
                                   </div>
                                 )}
                                 <div className="space-y-0.5">
-                                  <h5 className="text-[11px] font-bold text-white font-sans">{blockName}</h5>
+                                  <h5 className="text-[11px] font-bold text-white font-sans">Sector {idx + 1}</h5>
                                   <span className="text-[8px] uppercase font-mono tracking-wider text-white/35 block font-bold">
                                     {isCompleted ? 'Derrumbado' : isCurrent ? 'Sondeando...' : 'Bloqueado'}
                                   </span>
@@ -2403,7 +2351,6 @@ export default function App() {
                 mode="stage"
                 stageQuestion={HEART_STAGE_QUESTIONS[stageIndex]}
                 selectedOptions={stageAnswers[HEART_STAGE_QUESTIONS[stageIndex]?.id] || []}
-                dominantAreaTitle={primaryBlock.title}
                 userXp={userXp}
                 getExploradorLevel={getExploradorLevel}
                 onToggleOption={handleToggleStageOption}
@@ -2516,10 +2463,6 @@ export default function App() {
                       onClick={() => chooseTiebreakBelief(candidate.id)}
                       className="w-full text-left bg-[#161616] hover:bg-[#1E1E1E] border border-white/10 hover:border-[#C9A84C]/50 p-5 rounded-2xl transition-all cursor-pointer space-y-2"
                     >
-                      <span className="text-[10px] font-mono uppercase tracking-widest text-[#C9A84C] font-bold block">
-                        {candidate.alias} · {candidate.bloque}
-                      </span>
-                      <span className="text-white font-bold text-sm block">{candidate.creencia}</span>
                       <span className="text-white/60 text-sm italic leading-relaxed block">
                         “{candidate.afirmacionTest}”
                       </span>
